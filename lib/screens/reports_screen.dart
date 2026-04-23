@@ -17,7 +17,7 @@ class ReportsScreen extends ConsumerWidget {
     // ── Stats Calculation ──────────────────────────────────────────
     final totalCows = cows.length;
     final inseminatedNotBirth = cows.where((c) => c.isInseminated && !c.isPostBirth).length;
-    final pregnantConfirmed = cows.where((c) => c.isInseminated && !c.isPostBirth && c.daysSinceInsemination > 60).length;
+    final pregnantConfirmed = cows.where((c) => c.isInseminated && !c.isPostBirth && c.daysSinceInsemination > 25).length;
     final postBirth = cows.where((c) => c.isPostBirth).length;
     final notInseminated = cows.where((c) => !c.isInseminated && !c.isPostBirth).length;
 

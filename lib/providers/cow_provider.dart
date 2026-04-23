@@ -78,7 +78,7 @@ final filteredCowsProvider = Provider<List<Cow>>((ref) {
       result = cows;
       break;
     case CowFilter.pregnant:
-      result = cows.where((c) => !c.isPostBirth && c.isInseminated && c.daysSinceInsemination > 60).toList();
+      result = cows.where((c) => !c.isPostBirth && c.isInseminated && c.daysSinceInsemination > 25).toList();
       break;
     case CowFilter.monitoring:
       result = cows.where((c) => !c.isPostBirth && (c.status.contains('راقب') || !c.isInseminated)).toList();

@@ -20,7 +20,7 @@ class SummaryScreen extends ConsumerWidget {
     final urgentCount = smartAlerts.where((a) => a.severity == AlertSeverity.high).length;
     NotificationService().scheduleDailyMorningSummary(urgentCount, smartAlerts.length);
     final int totalCows = cows.length;
-    final int pregnantCount = cows.where((c) => c.isInseminated && !c.isPostBirth && c.daysSinceInsemination > 60).length;
+    final int pregnantCount = cows.where((c) => c.isInseminated && !c.isPostBirth && c.daysSinceInsemination > 25).length;
     final int postBirthCount = cows.where((c) => c.isPostBirth).length;
     
     // Calf counting logic

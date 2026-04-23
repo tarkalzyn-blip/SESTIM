@@ -14,6 +14,13 @@ class CowDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final cows = ref.watch(cowProvider);
+    // الحصول على أحدث بيانات لهذه البقرة من المزود لضمان التحديث التلقائي
+    final currentCow = cows.firstWhere(
+      (c) => c.uniqueKey == cow.uniqueKey,
+      orElse: () => cow,
+    );
+
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final textColor = theme.colorScheme.onSurface;
@@ -32,7 +39,7 @@ class CowDetailScreen extends ConsumerWidget {
                 tooltip: 'تعديل بيانات البقرة',
                 onPressed: () {
                   Navigator.push(context, MaterialPageRoute(
-                    builder: (_) => AddEditCowScreen(cow: cow),
+                    builder: (_) => AddEditCowScreen(cow: currentCow),
                   ));
                 },
               ),
@@ -44,7 +51,7 @@ class CowDetailScreen extends ConsumerWidget {
                     context: context,
                     builder: (ctx) => AlertDialog(
                       title: const Text('حذف البقرة'),
-                      content: Text('هل أنت متأكد من حذف البقرة رقم ${cow.id}؟ لا يمكن التراجع عن هذا.'),
+                      content: Text('هل أنت متأكد من حذف البقرة رقم ${currentCow.id}؟ لا يمكن التراجع عن هذا.'),
                       actions: [
                         TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
                         TextButton(
@@ -55,22 +62,22 @@ class CowDetailScreen extends ConsumerWidget {
                     ),
                   );
                   if (confirm == true) {
-                    ref.read(cowProvider.notifier).deleteCow(cow.uniqueKey);
+                    ref.read(cowProvider.notifier).deleteCow(currentCow.uniqueKey);
                     if (context.mounted) Navigator.pop(context);
                   }
                 },
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
-              title: Text('بقرة #${cow.id}', style: const TextStyle(fontWeight: FontWeight.bold)),
+              title: Text('بقرة #${currentCow.id}', style: const TextStyle(fontWeight: FontWeight.bold)),
               background: Hero(
-                tag: 'cow_card_${cow.uniqueKey}',
+                tag: 'cow_card_${currentCow.uniqueKey}',
                 child: Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [cow.color, cow.color.withValues(alpha: 0.6)],
+                      colors: [currentCow.color, currentCow.color.withValues(alpha: 0.6)],
                     ),
                   ),
                 ),
@@ -83,20 +90,20 @@ class CowDetailScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (cow.isPostBirth) ...[
-                    _buildDetailRow('تاريخ الولادة', DateFormat('yyyy-MM-dd').format(cow.birthDate!), Icons.child_care, subTextColor: subTextColor, textColor: textColor),
+                  if (currentCow.isPostBirth) ...[
+                    _buildDetailRow('تاريخ الولادة', DateFormat('yyyy-MM-dd').format(currentCow.birthDate!), Icons.child_care, subTextColor: subTextColor, textColor: textColor),
                     const SizedBox(height: 20),
-                    _buildDetailRow('أيام منذ الولادة', '${cow.daysSinceBirth} يوم', Icons.timer, subTextColor: subTextColor, textColor: textColor),
+                    _buildDetailRow('أيام منذ الولادة', '${currentCow.daysSinceBirth} يوم', Icons.timer, subTextColor: subTextColor, textColor: textColor),
                   ] else ...[
-                    _buildDetailRow(cow.isInseminated ? 'تاريخ التلقيح' : 'تاريخ آخر شبق', DateFormat('yyyy-MM-dd').format(cow.inseminationDate), Icons.calendar_today, subTextColor: subTextColor, textColor: textColor),
+                    _buildDetailRow(currentCow.isInseminated ? 'تاريخ التلقيح' : 'تاريخ آخر شبق', DateFormat('yyyy-MM-dd').format(currentCow.inseminationDate), Icons.calendar_today, subTextColor: subTextColor, textColor: textColor),
                     const SizedBox(height: 20),
-                    _buildDetailRow('الأيام المنقضية', '${cow.daysSinceInsemination} يوم', Icons.timer, subTextColor: subTextColor, textColor: textColor),
+                    _buildDetailRow('الأيام المنقضية', '${currentCow.daysSinceInsemination} يوم', Icons.timer, subTextColor: subTextColor, textColor: textColor),
                   ],
-                  if (cow.bullId != null && cow.bullId!.isNotEmpty) ...[
+                  if (currentCow.bullId != null && currentCow.bullId!.isNotEmpty) ...[
                     const SizedBox(height: 20),
-                    _buildDetailRow('معلومات الطلوقة', cow.bullId!, Icons.pets, color: Colors.blueGrey, subTextColor: subTextColor),
+                    _buildDetailRow('معلومات الطلوقة', currentCow.bullId!, Icons.pets, color: Colors.blueGrey, subTextColor: subTextColor),
                   ],
-                  if (cow.motherId != null && cow.motherId!.isNotEmpty) ...[
+                  if (currentCow.motherId != null && currentCow.motherId!.isNotEmpty) ...[
                     const SizedBox(height: 20),
                     Row(
                       children: [
@@ -108,12 +115,12 @@ class CowDetailScreen extends ConsumerWidget {
                             Text('رقم الأم', style: TextStyle(fontSize: 14, color: subTextColor)),
                             Row(
                               children: [
-                                Text(cow.motherId!, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-                                if (cow.motherColorValue != null) ...[
+                                Text(currentCow.motherId!, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                                if (currentCow.motherColorValue != null) ...[
                                   const SizedBox(width: 8),
                                   Container(
                                     width: 16, height: 16,
-                                    decoration: BoxDecoration(color: Color(cow.motherColorValue!), shape: BoxShape.circle),
+                                    decoration: BoxDecoration(color: Color(currentCow.motherColorValue!), shape: BoxShape.circle),
                                   )
                                 ]
                               ],
@@ -124,12 +131,12 @@ class CowDetailScreen extends ConsumerWidget {
                     ),
                   ],
                   const SizedBox(height: 20),
-                  _buildDetailRow('الحالة الحالية', cow.status, Icons.info_outline, color: cow.color, subTextColor: subTextColor),
+                  _buildDetailRow('الحالة الحالية', currentCow.status, Icons.info_outline, color: currentCow.color, subTextColor: subTextColor),
                   const SizedBox(height: 40),
                   const Text('نسبة تقدم الحمل', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
                   TweenAnimationBuilder<double>(
-                    tween: Tween<double>(begin: 0, end: cow.pregnancyPercentage),
+                    tween: Tween<double>(begin: 0, end: currentCow.pregnancyPercentage),
                     duration: const Duration(seconds: 2),
                     curve: Curves.easeOutCubic,
                     builder: (context, value, child) {
@@ -141,11 +148,11 @@ class CowDetailScreen extends ConsumerWidget {
                               value: value,
                               minHeight: 20,
                               backgroundColor: isDark ? Colors.white12 : Colors.grey.shade300,
-                              color: cow.color,
+                              color: currentCow.color,
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Text('${(value * 100).toInt()}%', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: cow.color)),
+                          Text('${(value * 100).toInt()}%', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: currentCow.color)),
                         ],
                       );
                     },
@@ -153,38 +160,38 @@ class CowDetailScreen extends ConsumerWidget {
                   const SizedBox(height: 30),
                   Row(
                     children: [
-                      if (cow.isInseminated && !cow.isPostBirth)
+                      if (currentCow.isInseminated && !currentCow.isPostBirth)
                         Expanded(
                           child: _buildActionCard(
                             context,
                             icon: Icons.child_friendly,
                             label: 'تسجيل ولادة',
                             color: Colors.teal,
-                            onTap: () => _showBirthDialog(context, ref),
+                            onTap: () => _showBirthDialog(context, ref, currentCow),
                           ),
                         ),
-                      if (cow.isInseminated && !cow.isPostBirth) const SizedBox(width: 12),
+                      if (currentCow.isInseminated && !currentCow.isPostBirth) const SizedBox(width: 12),
                       Expanded(
                         child: _buildActionCard(
                           context,
                           icon: Icons.science_outlined,
                           label: 'تسجيل تلقيح',
                           color: Colors.blueAccent,
-                          onTap: () => _showAddInseminationDialog(context, ref),
+                          onTap: () => _showAddInseminationDialog(context, ref, currentCow),
                         ),
                       ),
                     ],
                   ),
-                  if (cow.isInseminated && !cow.isPostBirth) ...[
+                  if (currentCow.isInseminated && !currentCow.isPostBirth) ...[
                   ],
 
                   const SizedBox(height: 40),
                   const Text('السجل التاريخي', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
-                  if (cow.history.isEmpty)
+                  if (currentCow.history.isEmpty)
                     const Text('لا يوجد سجلات سابقة', style: TextStyle(color: Colors.grey))
                   else
-                    ...cow.history.reversed.map((event) => _buildHistoryItem(event, subTextColor)),
+                    ...currentCow.history.reversed.map((event) => _buildHistoryItem(event, subTextColor)),
                 ],
               ),
             ),
@@ -264,9 +271,9 @@ class CowDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _showAddInseminationDialog(BuildContext context, WidgetRef ref) {
+  void _showAddInseminationDialog(BuildContext context, WidgetRef ref, Cow currentCow) {
     // التحقق من مدة الحمل الحالية (أكثر من 5 أشهر يمنع تسجيل تلقيح جديد كحماية)
-    if (cow.isInseminated && !cow.isPostBirth && cow.daysSinceInsemination > 150) {
+    if (currentCow.isInseminated && !currentCow.isPostBirth && currentCow.daysSinceInsemination > 150) {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -278,7 +285,7 @@ class CowDetailScreen extends ConsumerWidget {
             ],
           ),
           content: Text(
-            'البقرة ملقحة منذ أكثر من 5 أشهر (${cow.daysSinceInsemination} يوم).\n\n'
+            'البقرة ملقحة منذ أكثر من 5 أشهر (${currentCow.daysSinceInsemination} يوم).\n\n'
             'لا يمكن تسجيل تلقيح جديد في هذه المرحلة. إذا كان هناك خطأ في التاريخ السابق، يرجى تعديله من زر التعديل العلوي ✏️.',
           ),
           actions: [
@@ -289,7 +296,7 @@ class CowDetailScreen extends ConsumerWidget {
       return;
     }
 
-    final bullController = TextEditingController(text: cow.bullId);
+    final bullController = TextEditingController(text: currentCow.bullId);
     DateTime selectedDate = DateTime.now();
 
     showDialog(
@@ -322,15 +329,15 @@ class CowDetailScreen extends ConsumerWidget {
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
             FilledButton(
               onPressed: () {
-                List<dynamic> newHistory = cow.history.toList();
+                List<dynamic> newHistory = currentCow.history.toList();
                 
                 // إذا كانت البقرة ملقحة سابقاً ولم تلد، نعتبر التلقيح السابق فاشلاً
-                if (cow.isInseminated && !cow.isPostBirth) {
+                if (currentCow.isInseminated && !currentCow.isPostBirth) {
                   newHistory.add({
                     'title': 'فشل تلقيح سابق ❌',
                     'date': DateTime.now().toIso8601String(),
                     'eventId': DateTime.now().millisecondsSinceEpoch.toString(),
-                    'note': 'تم تسجيل تلقيح جديد بسبب عدم ثبوت الحمل السابق بعد ${cow.daysSinceInsemination} يوم.',
+                    'note': 'تم تسجيل تلقيح جديد بسبب عدم ثبوت الحمل السابق بعد ${currentCow.daysSinceInsemination} يوم.',
                   });
                 }
 
@@ -342,7 +349,7 @@ class CowDetailScreen extends ConsumerWidget {
                 });
                 
                 // Update the cow's main insemination date and status
-                ref.read(cowProvider.notifier).updateCow(cow.copyWith(
+                ref.read(cowProvider.notifier).updateCow(currentCow.copyWith(
                   inseminationDate: selectedDate,
                   bullId: bullController.text,
                   birthDate: null, // Reset birth date as it's a new pregnancy cycle
@@ -363,9 +370,9 @@ class CowDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _showBirthDialog(BuildContext context, WidgetRef ref) {
+  void _showBirthDialog(BuildContext context, WidgetRef ref, Cow currentCow) {
     // التحقق من مدة الحمل (أقل من 260 يوم يمنع تسجيل الولادة)
-    final daysSinceInsemination = cow.daysSinceInsemination;
+    final daysSinceInsemination = currentCow.daysSinceInsemination;
     if (daysSinceInsemination < 260) {
       final daysRemainingToThreshold = 260 - daysSinceInsemination;
       showDialog(
@@ -429,7 +436,7 @@ class CowDetailScreen extends ConsumerWidget {
                 CustomDatePickerField(
                   label: 'تاريخ الولادة',
                   initialDate: selectedBirthDate,
-                  firstDate: cow.inseminationDate,
+                  firstDate: currentCow.inseminationDate,
                   onDateSelected: (date) => selectedBirthDate = date,
                 ),
                 const SizedBox(height: 20),
@@ -489,7 +496,7 @@ class CowDetailScreen extends ConsumerWidget {
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
             FilledButton(
               onPressed: () {
-                List<dynamic> newHistory = cow.history.toList();
+                List<dynamic> newHistory = currentCow.history.toList();
                 String calfId = calfIdController.text.trim();
                 newHistory.add({
                   'title': 'تسجيل ولادة',
@@ -497,10 +504,10 @@ class CowDetailScreen extends ConsumerWidget {
                   'eventId': DateTime.now().millisecondsSinceEpoch.toString(),
                   'calfId': calfId.isEmpty ? null : calfId,
                   'calfColorValue': selectedCalfColorValue,
-                  'note': 'ولادة بعد ${selectedBirthDate.difference(cow.inseminationDate).inDays} يوم - المولود: $selectedGender${calfId.isNotEmpty ? ' - رقم: $calfId' : ''}',
+                  'note': 'ولادة بعد ${selectedBirthDate.difference(currentCow.inseminationDate).inDays} يوم - المولود: $selectedGender${calfId.isNotEmpty ? ' - رقم: $calfId' : ''}',
                 });
                 ref.read(cowProvider.notifier).updateCow(
-                  cow.copyWith(birthDate: selectedBirthDate, history: newHistory)
+                  currentCow.copyWith(birthDate: selectedBirthDate, history: newHistory)
                 );
                 Navigator.pop(ctx);
                 Navigator.pop(context);

@@ -87,10 +87,8 @@ class Cow {
       return "تجاوزت موعد الشبق";
     }
 
-    if (days < 19) return "بانتظار المراقبة";
-    if (days >= 19 && days <= 25) return "⚠ راقب البقرة";
-    if (days >= 26 && days <= 60) return "بانتظار التأكيد";
-    if (days > 60 && days < AppSettings.pregnancyDays - 20) return "حامل";
+    if (days <= 25) return "تحت المراقبة";
+    if (days > 25 && days < AppSettings.pregnancyDays - 20) return "حامل";
     if (days >= AppSettings.pregnancyDays - 20 && days <= AppSettings.pregnancyDays) return "قريبة من الولادة";
     return "تجاوزت موعد الولادة";
   }
