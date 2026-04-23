@@ -2,6 +2,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:cow_pregnancy/models/cow_model.dart';
+import 'package:cow_pregnancy/utils/app_settings.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
 
@@ -157,6 +158,49 @@ class NotificationService {
       await _notificationsPlugin.cancel(id: baseId + 5);
     } catch (e) {
       debugPrint('Notification Cancel Error: $e');
+    }
+  }
+
+  /// Schedules a daily morning notification at 8:00 AM summarizing active alerts.
+  Future<void> scheduleDailyMorningSummary(int urgentCount, int totalCount) async {
+    try {
+      // Cancel previous daily notification
+      await _notificationsPlugin.cancel(id: 99999);
+      if (totalCount == 0) return;
+
+      final now = DateTime.now();
+      var scheduledDate = DateTime(now.year, now.month, now.day, AppSettings.notificationHour, 0, 0);
+      if (scheduledDate.isBefore(now)) {
+        scheduledDate = scheduledDate.add(const Duration(days: 1));
+      }
+
+      final String title = urgentCount > 0
+          ? '🚨 تنبيه عاجل: $urgentCount مهام عاجلة'
+          : '📋 ملخص مزرعتك الصباحي';
+      final String body = urgentCount > 0
+          ? 'لديك $urgentCount مهام عاجلة و$totalCount تنبيه بالمجموع. افتح التطبيق لاتخاذ الإجراءات.'
+          : 'لديك $totalCount تنبيه تستحق المتابعة اليوم. تحقق من لوحة التحكم.';
+
+      await _notificationsPlugin.zonedSchedule(
+        id: 99999,
+        title: title,
+        body: body,
+        scheduledDate: tz.TZDateTime.from(scheduledDate, tz.local),
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'daily_summary_channel',
+            'الملخص اليومي',
+            channelDescription: 'إشعار صباحي يومي بملخص مهام المزرعة',
+            importance: Importance.high,
+            priority: Priority.high,
+            styleInformation: BigTextStyleInformation(''),
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time, // Repeat daily
+      );
+    } catch (e) {
+      debugPrint('Daily Summary Notification Error: $e');
     }
   }
 }

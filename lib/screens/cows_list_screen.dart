@@ -4,6 +4,7 @@ import 'package:cow_pregnancy/providers/cow_provider.dart';
 import 'package:cow_pregnancy/screens/add_edit_cow_screen.dart';
 import 'package:cow_pregnancy/widgets/cow_card.dart';
 import 'package:cow_pregnancy/widgets/cow_search_delegate.dart';
+import 'package:cow_pregnancy/screens/settings_screen.dart';
 
 class CowsListScreen extends ConsumerWidget {
   const CowsListScreen({super.key});
@@ -18,6 +19,10 @@ class CowsListScreen extends ConsumerWidget {
         title: const Text('إدارة الأبقار', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+          ),
           PopupMenuButton<CowSort>(
             icon: const Icon(Icons.sort),
             tooltip: 'فرز الأبقار',

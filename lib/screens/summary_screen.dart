@@ -6,6 +6,7 @@ import 'package:cow_pregnancy/widgets/stat_card.dart';
 import 'package:cow_pregnancy/models/cow_model.dart';
 import 'package:cow_pregnancy/screens/settings_screen.dart';
 import 'package:cow_pregnancy/screens/cow_detail_screen.dart';
+import 'package:cow_pregnancy/services/notification_service.dart';
 
 class SummaryScreen extends ConsumerWidget {
   const SummaryScreen({super.key});
@@ -14,7 +15,10 @@ class SummaryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cows = ref.watch(cowProvider);
     final smartAlerts = ref.watch(alertsProvider);
-    
+
+    // Schedule daily morning notification whenever alerts change
+    final urgentCount = smartAlerts.where((a) => a.severity == AlertSeverity.high).length;
+    NotificationService().scheduleDailyMorningSummary(urgentCount, smartAlerts.length);
     final int totalCows = cows.length;
     final int pregnantCount = cows.where((c) => c.isInseminated && !c.isPostBirth && c.daysSinceInsemination > 60).length;
     final int postBirthCount = cows.where((c) => c.isPostBirth).length;
@@ -26,7 +30,8 @@ class SummaryScreen extends ConsumerWidget {
     
     for (var cow in cows) {
       for (var event in cow.history) {
-        if (event['title'] == 'تسجيل ولادة') {
+        final title = event['title']?.toString() ?? '';
+        if (title == 'تسجيل ولادة' || title == 'تسجيل ولادة سابقة') {
           totalCalves++;
           String note = event['note'] ?? '';
           if (note.contains('ذكر')) {

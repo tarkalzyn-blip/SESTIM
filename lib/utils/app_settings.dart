@@ -17,4 +17,7 @@ class AppSettings {
 
   static bool get exactSearchMatch => _box.get('exactSearchMatch', defaultValue: false);
   static Future<void> setExactSearchMatch(bool val) => _box.put('exactSearchMatch', val);
+
+  static int get notificationHour => _box.get('notificationHour', defaultValue: 8);
+  static Future<void> setNotificationHour(int val) => _box.put('notificationHour', val);
 }

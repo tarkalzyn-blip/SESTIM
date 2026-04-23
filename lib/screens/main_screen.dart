@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cow_pregnancy/screens/summary_screen.dart';
 import 'package:cow_pregnancy/screens/cows_list_screen.dart';
 import 'package:cow_pregnancy/screens/calves_screen.dart';
-import 'package:cow_pregnancy/screens/post_birth_screen.dart';
+import 'package:cow_pregnancy/screens/activity_log_screen.dart';
+import 'package:cow_pregnancy/screens/reports_screen.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
@@ -14,13 +15,14 @@ class MainScreen extends ConsumerStatefulWidget {
 }
 
 class _MainScreenState extends ConsumerState<MainScreen> {
-  int _selectedIndex = 0; // Default to Dashboard
+  int _selectedIndex = 0;
 
   final List<Widget> _screens = [
     const SummaryScreen(),
     const CowsListScreen(),
     const CalvesScreen(),
-    const PostBirthScreen(),
+    const ActivityLogScreen(),
+    const ReportsScreen(),
   ];
 
   @override
@@ -84,9 +86,14 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                   label: 'العجول',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.medical_services_outlined),
-                  activeIcon: Icon(Icons.medical_services),
-                  label: 'بعد الولادة',
+                  icon: Icon(Icons.history_outlined),
+                  activeIcon: Icon(Icons.history),
+                  label: 'سجل النشاطات',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.bar_chart_outlined),
+                  activeIcon: Icon(Icons.bar_chart),
+                  label: 'التقارير',
                 ),
               ],
             ),

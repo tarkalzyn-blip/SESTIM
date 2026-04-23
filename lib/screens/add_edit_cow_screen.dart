@@ -81,7 +81,7 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
         String title = '';
         if (_currentState == CowFormState.pregnant) title = 'تسجيل تلقيح';
         if (_currentState == CowFormState.heat) title = 'تسجيل شبق';
-        if (_currentState == CowFormState.postBirth) title = 'تسجيل ولادة سابقة';
+        if (_currentState == CowFormState.postBirth) title = 'تسجيل ولادة';
 
         history.add({
           'title': title,

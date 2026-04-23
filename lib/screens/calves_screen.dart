@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cow_pregnancy/providers/cow_provider.dart';
 import 'package:cow_pregnancy/utils/app_settings.dart';
-import 'package:intl/intl.dart';
 import 'package:cow_pregnancy/screens/calf_detail_screen.dart';
+import 'package:cow_pregnancy/screens/settings_screen.dart';
 
 enum CalfSort { newest, oldest }
 enum CalfFilter { active, male, female, exited }
@@ -37,6 +37,27 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
     final remainingDays = days % 30;
     if (remainingDays == 0) return '$months شهر';
     return '$months شهر و $remainingDays يوم';
+  }
+
+  /// Matches a Hive history event to a calf by trying 3 strategies:
+  /// 1. eventId match (new records)
+  /// 2. Exact date string match
+  /// 3. DateTime milliseconds match (handles format differences from Hive)
+  bool _matchBirthEvent(dynamic event, String eventId, String originalEventDate) {
+    final title = event['title']?.toString() ?? '';
+    if (title != 'تسجيل ولادة' && title != 'تسجيل ولادة سابقة') return false;
+    final storedEvId = event['eventId']?.toString();
+    // Strategy 1: eventId (reliable for new records)
+    if (storedEvId != null && storedEvId == eventId) return true;
+    // Strategy 2: exact string
+    if (event['date']?.toString() == originalEventDate) return true;
+    // Strategy 3: DateTime comparison (handles timezone/format drift from Hive)
+    try {
+      final a = DateTime.parse(event['date'].toString());
+      final b = DateTime.parse(originalEventDate);
+      if (a.millisecondsSinceEpoch == b.millisecondsSinceEpoch) return true;
+    } catch (_) {}
+    return false;
   }
 
   void _editCalf(BuildContext context, WidgetRef ref, String motherUniqueKey, String eventId, String originalEventDate, String? currentCalfId, int? currentColorValue) {
@@ -102,10 +123,7 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                 if (cowIndex != -1) {
                   final cow = cows[cowIndex];
                   final newHistory = cow.history.map((event) {
-                    final eventEventId = event['eventId']?.toString();
-                    final matchById = eventEventId != null && eventEventId == eventId;
-                    final matchByDate = event['date'].toString() == originalEventDate;
-                    if (event['title'] == 'تسجيل ولادة' && (matchById || (!matchById && eventEventId == null && matchByDate))) {
+                    if (_matchBirthEvent(event, eventId, originalEventDate)) {
                       final Map<String, dynamic> newEvent = Map.from(event);
                       final String newId = controller.text.trim();
                       newEvent['calfId'] = newId.isEmpty ? null : newId;
@@ -131,6 +149,36 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
     );
   }
 
+  void _deleteCalf(BuildContext context, WidgetRef ref, String motherUniqueKey, String eventId, String originalEventDate, String? calfId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حذف سجل العجل'),
+        content: Text('هل أنت متأكد من حذف سجل العجل رقم "${calfId ?? 'بدون رقم'}"؟ لا يمكن التراجع عن هذه العملية.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('حذف', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final cows = ref.read(cowProvider);
+    final cowIndex = cows.indexWhere((c) => c.uniqueKey == motherUniqueKey);
+    if (cowIndex == -1) return;
+
+    final cow = cows[cowIndex];
+    final newHistory = cow.history.where((event) {
+      return !_matchBirthEvent(event, eventId, originalEventDate);
+    }).toList();
+
+    ref.read(cowProvider.notifier).updateCow(cow.copyWith(history: newHistory));
+  }
+
   @override
   Widget build(BuildContext context) {
     final cows = ref.watch(cowProvider);
@@ -138,7 +186,8 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
     List<Map<String, dynamic>> calves = [];
     for (var cow in cows) {
       for (var event in cow.history) {
-        if (event['title'] == 'تسجيل ولادة') {
+        final title = event['title']?.toString() ?? '';
+        if (title == 'تسجيل ولادة' || title == 'تسجيل ولادة سابقة') {
           calves.add({
             'date': DateTime.parse(event['date']),
             'originalEventDate': event['date'],
@@ -154,6 +203,7 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
             'exitPrice': event['exitPrice'],
             'exitDate': event['exitDate'],
             'weights': event['weights'] ?? [],
+            'vaccines': event['vaccines'] ?? [],
           });
         }
       }
@@ -214,6 +264,11 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
             : const Text('سجل المواليد (العجول)', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: !_isSearching,
         actions: [
+          if (!_isSearching)
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+            ),
           if (_isSearching)
             IconButton(
               icon: const Icon(Icons.clear),
@@ -319,6 +374,23 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                                     child: Row(
                                       crossAxisAlignment: CrossAxisAlignment.center,
                                       children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: calf['isExited'] == true ? Colors.grey.withValues(alpha: 0.2) : calfColor.withValues(alpha: 0.15),
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: calf['isExited'] == true ? Colors.grey : calfColor, width: 2),
+                                          ),
+                                          child: Text(
+                                            calfId?.toString() ?? '?',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 18,
+                                              color: calf['isExited'] == true ? Colors.grey : calfColor,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -326,21 +398,12 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                                               Row(
                                                 children: [
                                                   Text(
-                                                    'رقم ${calfId ?? "بدون"}',
+                                                    'مولود #${calfId ?? "بدون"}',
                                                     style: TextStyle(
                                                       fontWeight: FontWeight.bold,
-                                                      fontSize: 18,
+                                                      fontSize: 16,
                                                       decoration: calf['isExited'] == true ? TextDecoration.lineThrough : null,
                                                       color: calf['isExited'] == true ? Colors.grey : null,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  Container(
-                                                    width: 14,
-                                                    height: 14,
-                                                    decoration: BoxDecoration(
-                                                      color: calf['isExited'] == true ? Colors.grey : calfColor,
-                                                      shape: BoxShape.circle,
                                                     ),
                                                   ),
                                                   if (calf['isExited'] == true) ...[
@@ -388,8 +451,14 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                                           ),
                                         ),
                                         IconButton(
-                                          icon: const Icon(Icons.edit_outlined, size: 20),
+                                          icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.blueGrey),
+                                          tooltip: 'تعديل',
                                           onPressed: () => _editCalf(context, ref, calf['motherUniqueKey'], calf['eventId'], calf['originalEventDate'], calfId, calf['calfColorValue']),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete_outline, size: 20, color: Colors.redAccent),
+                                          tooltip: 'حذف',
+                                          onPressed: () => _deleteCalf(context, ref, calf['motherUniqueKey'], calf['eventId'], calf['originalEventDate'], calfId),
                                         ),
                                       ],
                                     ),

@@ -78,6 +78,31 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: Colors.red.shade900),
+              onPressed: () {
+                Navigator.pop(ctx);
+                showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text('⚠️ تأكيد الحذف', style: TextStyle(color: Colors.red)),
+                    content: const Text('سيتم حذف سجل هذا العجل نهائياً ولا يمكن التراجع. هل أنت متأكد؟'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+                      FilledButton(
+                        style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _processDelete();
+                        },
+                        child: const Text('حذف نهائي'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              child: const Text('🗑️ حذف'),
+            ),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: Colors.red),
               onPressed: () {
@@ -93,19 +118,20 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
   }
 
   void _processExit(String reason, String price, String note) {
+    if (reason == 'حذف') {
+      _processDelete();
+      return;
+    }
     final cows = ref.read(cowProvider);
     final cowIndex = cows.indexWhere((c) => c.uniqueKey == _currentCalfData['motherUniqueKey']);
     
     if (cowIndex != -1) {
       final cow = cows[cowIndex];
-      final originalDate = _currentCalfData['originalEventDate']; // Need to pass this
+      final originalDate = _currentCalfData['originalEventDate'];
+      final storedEventId = _currentCalfData['eventId']?.toString();
       
       final newHistory = cow.history.map((event) {
-        final eventEventId = event['eventId']?.toString();
-        final storedEventId = _currentCalfData['eventId']?.toString();
-        final matchById = eventEventId != null && storedEventId != null && eventEventId == storedEventId;
-        final matchByDate = event['date'].toString() == originalDate;
-        if (event['title'] == 'تسجيل ولادة' && (matchById || (!matchById && eventEventId == null && matchByDate))) {
+        if (_matchEvent(event, storedEventId, originalDate)) {
           final newEvent = Map<String, dynamic>.from(event);
           newEvent['isExited'] = true;
           newEvent['exitReason'] = reason;
@@ -131,6 +157,38 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
         SnackBar(content: Text('تم استبعاد العجل بنجاح (السبب: $reason)')),
       );
     }
+  }
+
+  void _processDelete() {
+    final cows = ref.read(cowProvider);
+    final cowIndex = cows.indexWhere((c) => c.uniqueKey == _currentCalfData['motherUniqueKey']);
+    if (cowIndex != -1) {
+      final cow = cows[cowIndex];
+      final originalDate = _currentCalfData['originalEventDate'];
+      final storedEventId = _currentCalfData['eventId']?.toString();
+      final newHistory = cow.history
+          .where((event) => !_matchEvent(event, storedEventId, originalDate))
+          .toList();
+      ref.read(cowProvider.notifier).updateCow(cow.copyWith(history: newHistory));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم حذف سجل العجل بنجاح'), backgroundColor: Colors.red),
+      );
+      Navigator.pop(context);
+    }
+  }
+
+  bool _matchEvent(dynamic event, String? storedEventId, String originalDate) {
+    final title = event['title']?.toString() ?? '';
+    if (title != 'تسجيل ولادة' && title != 'تسجيل ولادة سابقة') return false;
+    final evId = event['eventId']?.toString();
+    if (evId != null && storedEventId != null && evId == storedEventId) return true;
+    if (event['date']?.toString() == originalDate) return true;
+    try {
+      final a = DateTime.parse(event['date'].toString());
+      final b = DateTime.parse(originalDate);
+      if (a.millisecondsSinceEpoch == b.millisecondsSinceEpoch) return true;
+    } catch (_) {}
+    return false;
   }
 
   void _showAddWeightDialog() {
@@ -165,6 +223,72 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
     );
   }
 
+  void _showAddVaccineDialog() {
+    final vaccineController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تسجيل لقاح جديد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
+        content: TextField(
+          controller: vaccineController,
+          decoration: InputDecoration(
+            labelText: 'اسم اللقاح',
+            prefixIcon: const Icon(Icons.vaccines),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          FilledButton(
+            onPressed: () {
+              if (vaccineController.text.isNotEmpty) {
+                _processAddVaccine(vaccineController.text.trim());
+                Navigator.pop(ctx);
+              }
+            },
+            style: FilledButton.styleFrom(backgroundColor: Colors.teal),
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _processAddVaccine(String vaccineName) {
+    final cows = ref.read(cowProvider);
+    final cowIndex = cows.indexWhere((c) => c.uniqueKey == _currentCalfData['motherUniqueKey']);
+    
+    if (cowIndex != -1) {
+      final cow = cows[cowIndex];
+      final originalDate = _currentCalfData['originalEventDate'];
+      final storedEventId = _currentCalfData['eventId']?.toString();
+      final newHistory = cow.history.map((event) {
+        if (_matchEvent(event, storedEventId, originalDate)) {
+          final newEvent = Map<String, dynamic>.from(event);
+          List<dynamic> vaccines = List.from(newEvent['vaccines'] ?? []);
+          vaccines.add({
+            'date': DateTime.now().toIso8601String(),
+            'name': vaccineName,
+          });
+          newEvent['vaccines'] = vaccines;
+          
+          setState(() {
+            _currentCalfData['vaccines'] = vaccines;
+          });
+          
+          return newEvent;
+        }
+        return event;
+      }).toList();
+      
+      ref.read(cowProvider.notifier).updateCow(cow.copyWith(history: newHistory));
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تسجيل اللقاح بنجاح'), backgroundColor: Colors.teal),
+      );
+    }
+  }
+
   void _processAddWeight(double weight) {
     if (weight <= 0) return;
 
@@ -174,13 +298,9 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
     if (cowIndex != -1) {
       final cow = cows[cowIndex];
       final originalDate = _currentCalfData['originalEventDate'];
-      
+      final storedEventId = _currentCalfData['eventId']?.toString();
       final newHistory = cow.history.map((event) {
-        final eventEventId = event['eventId']?.toString();
-        final storedEventId = _currentCalfData['eventId']?.toString();
-        final matchById = eventEventId != null && storedEventId != null && eventEventId == storedEventId;
-        final matchByDate = event['date'].toString() == originalDate;
-        if (event['title'] == 'تسجيل ولادة' && (matchById || (!matchById && eventEventId == null && matchByDate))) {
+        if (_matchEvent(event, storedEventId, originalDate)) {
           final newEvent = Map<String, dynamic>.from(event);
           List<dynamic> weights = List.from(newEvent['weights'] ?? []);
           weights.add({
@@ -307,7 +427,13 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Expanded(child: _buildActionBtn(Icons.vaccines_outlined, 'اللقاحات (قريباً)', Colors.teal)),
+                Expanded(
+                  child: InkWell(
+                    onTap: isExited ? null : _showAddVaccineDialog,
+                    borderRadius: BorderRadius.circular(15),
+                    child: _buildActionBtn(Icons.vaccines_outlined, 'تسجيل لقاح', Colors.teal),
+                  ),
+                ),
               ],
             ),
 
@@ -325,6 +451,24 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
                     leading: const CircleAvatar(backgroundColor: Colors.blue, child: Icon(Icons.monitor_weight, color: Colors.white, size: 20)),
                     title: Text('${w['weight']} كغ', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                     subtitle: Text(DateFormat('yyyy/MM/dd HH:mm').format(date)),
+                  ),
+                );
+              }),
+              const SizedBox(height: 20),
+            ],
+
+            // Vaccines History
+            if (_currentCalfData['vaccines'] != null && (_currentCalfData['vaccines'] as List).isNotEmpty) ...[
+              const Text('سجل اللقاحات', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+              const SizedBox(height: 10),
+              ...(_currentCalfData['vaccines'] as List).reversed.map((v) {
+                final date = DateTime.parse(v['date']);
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: const CircleAvatar(backgroundColor: Colors.teal, child: Icon(Icons.vaccines, color: Colors.white, size: 20)),
+                    title: Text('${v['name']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text(DateFormat('yyyy/MM/dd').format(date)),
                   ),
                 );
               }),

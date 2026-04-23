@@ -23,7 +23,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _recoveryController = TextEditingController(text: AppSettings.recoveryDays.toString());
     _heatController = TextEditingController(text: AppSettings.heatCycleDays.toString());
     _exactSearchMatch = AppSettings.exactSearchMatch;
+    _notificationHour = AppSettings.notificationHour;
   }
+  
+  late int _notificationHour;
 
   @override
   void dispose() {
@@ -72,6 +75,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ref.read(themeProvider.notifier).toggleTheme(val);
                 },
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: ListTile(
+                leading: const Icon(Icons.notifications_active, color: Colors.blueAccent),
+                title: const Text('موعد التنبيه الصباحي', style: TextStyle(fontWeight: FontWeight.bold)),
+                trailing: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(color: Colors.blueAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                  child: Text('${_notificationHour.toString().padLeft(2, '0')}:00', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+                ),
+                onTap: () async {
+                  final time = await showTimePicker(
+                    context: context,
+                    initialTime: TimeOfDay(hour: _notificationHour, minute: 0),
+                  );
+                  if (time != null) {
+                    setState(() => _notificationHour = time.hour);
+                    await AppSettings.setNotificationHour(time.hour);
+                  }
+                },
               ),
             ),
             const SizedBox(height: 16),
