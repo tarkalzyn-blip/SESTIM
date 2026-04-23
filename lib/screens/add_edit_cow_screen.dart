@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cow_pregnancy/models/cow_model.dart';
 import 'package:cow_pregnancy/providers/cow_provider.dart';
 import 'package:intl/intl.dart';
+import 'package:cow_pregnancy/widgets/custom_date_picker.dart';
 
 enum CowFormState { pregnant, heat, postBirth }
 
@@ -218,25 +219,10 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
               ),
               const SizedBox(height: 20),
               _buildAnimatedItem(
-                ListTile(
-                  shape: RoundedRectangleBorder(
-                    side: BorderSide(color: Colors.grey.shade400),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  leading: const Icon(Icons.calendar_today),
-                  title: Text(_getDateLabel()),
-                  subtitle: Text(DateFormat('yyyy-MM-dd').format(_selectedDate)),
-                  onTap: () async {
-                    final date = await showDatePicker(
-                      context: context,
-                      initialDate: _selectedDate,
-                      firstDate: DateTime(2010),
-                      lastDate: DateTime.now(),
-                    );
-                    if (date != null) {
-                      setState(() => _selectedDate = date);
-                    }
-                  },
+                CustomDatePickerField(
+                  label: _getDateLabel(),
+                  initialDate: _selectedDate,
+                  onDateSelected: (date) => setState(() => _selectedDate = date),
                 ),
                 100,
               ),

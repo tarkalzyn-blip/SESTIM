@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cow_pregnancy/providers/cow_provider.dart';
+import 'package:cow_pregnancy/models/cow_model.dart';
 import 'package:cow_pregnancy/utils/app_settings.dart';
 import 'package:cow_pregnancy/screens/calf_detail_screen.dart';
 import 'package:cow_pregnancy/screens/settings_screen.dart';
+import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
+import 'package:cow_pregnancy/widgets/custom_date_picker.dart';
 
 enum CalfSort { newest, oldest }
 enum CalfFilter { active, male, female, exited }
@@ -33,10 +37,20 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
     final days = difference.inDays;
     
     if (days < 30) return '$days يوم';
-    final months = days ~/ 30;
-    final remainingDays = days % 30;
-    if (remainingDays == 0) return '$months شهر';
-    return '$months شهر و $remainingDays يوم';
+    if (days < 365) {
+      final months = days ~/ 30;
+      final remainingDays = days % 30;
+      if (remainingDays == 0) return '$months شهر';
+      return '$months شهر و $remainingDays يوم';
+    }
+    final years = days ~/ 365;
+    final remainingMonths = (days % 365) ~/ 30;
+    if (remainingMonths == 0) return '$years سنة';
+    return '$years سنة و $remainingMonths شهر';
+  }
+
+  int _calculateAgeInDays(DateTime birthDate) {
+    return DateTime.now().difference(birthDate).inDays;
   }
 
   /// Matches a Hive history event to a calf by trying 3 strategies:
@@ -177,6 +191,90 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
     }).toList();
 
     ref.read(cowProvider.notifier).updateCow(cow.copyWith(history: newHistory));
+  }
+
+  void _moveToHerd(BuildContext context, WidgetRef ref, Map<String, dynamic> calf) async {
+    DateTime selectedInsemDate = DateTime.now();
+    
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          title: const Text('انتقال للقطيع (تلقيح أول)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('سيتم نقل العجولة رقم ${calf['calfId']} إلى قائمة الأبقار بعد تسجيل أول تلقيح لها.'),
+              const SizedBox(height: 20),
+              const Text('تاريخ التلقيح الأول:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              CustomDatePickerField(
+                label: 'تاريخ التلقيح',
+                initialDate: selectedInsemDate,
+                firstDate: calf['date'],
+                onDateSelected: (date) => selectedInsemDate = date,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(backgroundColor: Colors.teal),
+              child: const Text('تأكيد التلقيح والنقل'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final cows = ref.read(cowProvider);
+    final motherIndex = cows.indexWhere((c) => c.uniqueKey == calf['motherUniqueKey']);
+    if (motherIndex == -1) return;
+
+    final mother = cows[motherIndex];
+    
+    // 1. Mark calf as exited in mother's history
+    final newMotherHistory = mother.history.map((event) {
+      if (_matchBirthEvent(event, calf['eventId'], calf['originalEventDate'])) {
+        final newEvent = Map<String, dynamic>.from(event);
+        newEvent['isExited'] = true;
+        newEvent['exitReason'] = 'انتقال للقطيع (تلقيح)';
+        newEvent['exitDate'] = DateTime.now().toIso8601String();
+        return newEvent;
+      }
+      return event;
+    }).toList();
+    
+    await ref.read(cowProvider.notifier).updateCow(mother.copyWith(history: newMotherHistory));
+
+    // 2. Create new Cow record
+    final newCow = Cow(
+      id: calf['calfId'] ?? 'عجولة جديدة',
+      inseminationDate: selectedInsemDate,
+      colorValue: calf['calfColorValue'],
+      motherId: mother.id,
+      motherColorValue: mother.colorValue,
+      isInseminated: true,
+      history: [
+        {
+          'title': 'تلقيح أول (انتقال من العجولات)',
+          'date': selectedInsemDate.toIso8601String(),
+          'eventId': const Uuid().v4(),
+          'note': 'تم النقل من سجل المواليد بعد بلوغ سن السنة والتلقيح الأول.',
+        }
+      ],
+    );
+
+    await ref.read(cowProvider.notifier).addCow(newCow);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تم نقل العجولة رقم ${calf['calfId']} إلى قطيع الأبقار بنجاح.'), backgroundColor: Colors.teal),
+      );
+    }
   }
 
   @override
@@ -455,6 +553,13 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                                           tooltip: 'تعديل',
                                           onPressed: () => _editCalf(context, ref, calf['motherUniqueKey'], calf['eventId'], calf['originalEventDate'], calfId, calf['calfColorValue']),
                                         ),
+                                        // Insemination Move Button for Heifers >= 1 Year
+                                        if (!isMale && calf['isExited'] != true && _calculateAgeInDays(calf['date']) >= 365)
+                                          IconButton(
+                                            icon: const Icon(Icons.upgrade, size: 22, color: Colors.teal),
+                                            tooltip: 'تلقيح ونقل للقطيع',
+                                            onPressed: () => _moveToHerd(context, ref, calf),
+                                          ),
                                         IconButton(
                                           icon: const Icon(Icons.delete_outline, size: 20, color: Colors.redAccent),
                                           tooltip: 'حذف',

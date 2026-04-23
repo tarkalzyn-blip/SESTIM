@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cow_pregnancy/providers/cow_provider.dart';
 import 'package:intl/intl.dart';
+import 'package:cow_pregnancy/widgets/custom_date_picker.dart';
 
 class CalfDetailScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> calfData;
@@ -23,6 +24,7 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
 
   void _showExitDialog() {
     String selectedReason = 'بيع';
+    DateTime exitDate = DateTime.now();
     final priceController = TextEditingController();
     final noteController = TextEditingController();
 
@@ -65,13 +67,10 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
                   ),
                 ],
                 const SizedBox(height: 16),
-                TextField(
-                  controller: noteController,
-                  maxLines: 2,
-                  decoration: InputDecoration(
-                    labelText: 'ملاحظات إضافية (اختياري)',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
+                CustomDatePickerField(
+                  label: 'تاريخ الاستبعاد',
+                  initialDate: exitDate,
+                  onDateSelected: (date) => exitDate = date,
                 ),
               ],
             ),
@@ -106,7 +105,7 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: Colors.red),
               onPressed: () {
-                _processExit(selectedReason, priceController.text, noteController.text);
+                _processExit(selectedReason, priceController.text, noteController.text, exitDate);
                 Navigator.pop(ctx);
               },
               child: const Text('تأكيد الاستبعاد'),
@@ -117,7 +116,7 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
     );
   }
 
-  void _processExit(String reason, String price, String note) {
+  void _processExit(String reason, String price, String note, DateTime date) {
     if (reason == 'حذف') {
       _processDelete();
       return;
@@ -137,7 +136,7 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
           newEvent['exitReason'] = reason;
           newEvent['exitPrice'] = price;
           newEvent['exitNote'] = note;
-          newEvent['exitDate'] = DateTime.now().toIso8601String();
+          newEvent['exitDate'] = date.toIso8601String();
           
           setState(() {
             _currentCalfData['isExited'] = true;
@@ -193,68 +192,96 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
 
   void _showAddWeightDialog() {
     final weightController = TextEditingController();
+    DateTime selectedDate = DateTime.now();
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('تسجيل وزن جديد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
-        content: TextField(
-          controller: weightController,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            labelText: 'الوزن',
-            suffixText: 'كغ',
-            prefixIcon: const Icon(Icons.monitor_weight),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          title: const Text('تسجيل وزن جديد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: weightController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'الوزن',
+                  suffixText: 'كغ',
+                  prefixIcon: const Icon(Icons.monitor_weight),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              CustomDatePickerField(
+                label: 'تاريخ الوزن',
+                initialDate: selectedDate,
+                onDateSelected: (date) => selectedDate = date,
+              ),
+            ],
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            FilledButton(
+              onPressed: () {
+                if (weightController.text.isNotEmpty) {
+                  _processAddWeight(double.tryParse(weightController.text) ?? 0, selectedDate);
+                  Navigator.pop(ctx);
+                }
+              },
+              child: const Text('حفظ'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-          FilledButton(
-            onPressed: () {
-              if (weightController.text.isNotEmpty) {
-                _processAddWeight(double.tryParse(weightController.text) ?? 0);
-                Navigator.pop(ctx);
-              }
-            },
-            child: const Text('حفظ'),
-          ),
-        ],
       ),
     );
   }
 
   void _showAddVaccineDialog() {
     final vaccineController = TextEditingController();
+    DateTime selectedDate = DateTime.now();
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('تسجيل لقاح جديد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
-        content: TextField(
-          controller: vaccineController,
-          decoration: InputDecoration(
-            labelText: 'اسم اللقاح',
-            prefixIcon: const Icon(Icons.vaccines),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          title: const Text('تسجيل لقاح جديد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: vaccineController,
+                decoration: InputDecoration(
+                  labelText: 'اسم اللقاح',
+                  prefixIcon: const Icon(Icons.vaccines),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              CustomDatePickerField(
+                label: 'تاريخ اللقاح',
+                initialDate: selectedDate,
+                onDateSelected: (date) => selectedDate = date,
+              ),
+            ],
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            FilledButton(
+              onPressed: () {
+                if (vaccineController.text.isNotEmpty) {
+                  _processAddVaccine(vaccineController.text.trim(), selectedDate);
+                  Navigator.pop(ctx);
+                }
+              },
+              style: FilledButton.styleFrom(backgroundColor: Colors.teal),
+              child: const Text('حفظ'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-          FilledButton(
-            onPressed: () {
-              if (vaccineController.text.isNotEmpty) {
-                _processAddVaccine(vaccineController.text.trim());
-                Navigator.pop(ctx);
-              }
-            },
-            style: FilledButton.styleFrom(backgroundColor: Colors.teal),
-            child: const Text('حفظ'),
-          ),
-        ],
       ),
     );
   }
 
-  void _processAddVaccine(String vaccineName) {
+  void _processAddVaccine(String vaccineName, DateTime date) {
     final cows = ref.read(cowProvider);
     final cowIndex = cows.indexWhere((c) => c.uniqueKey == _currentCalfData['motherUniqueKey']);
     
@@ -267,7 +294,7 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
           final newEvent = Map<String, dynamic>.from(event);
           List<dynamic> vaccines = List.from(newEvent['vaccines'] ?? []);
           vaccines.add({
-            'date': DateTime.now().toIso8601String(),
+            'date': date.toIso8601String(),
             'name': vaccineName,
           });
           newEvent['vaccines'] = vaccines;
@@ -289,7 +316,7 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
     }
   }
 
-  void _processAddWeight(double weight) {
+  void _processAddWeight(double weight, DateTime date) {
     if (weight <= 0) return;
 
     final cows = ref.read(cowProvider);
@@ -304,7 +331,7 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
           final newEvent = Map<String, dynamic>.from(event);
           List<dynamic> weights = List.from(newEvent['weights'] ?? []);
           weights.add({
-            'date': DateTime.now().toIso8601String(),
+            'date': date.toIso8601String(),
             'weight': weight,
           });
           newEvent['weights'] = weights;

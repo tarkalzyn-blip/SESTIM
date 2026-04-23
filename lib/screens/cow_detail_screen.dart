@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cow_pregnancy/widgets/custom_date_picker.dart';
 import 'package:cow_pregnancy/models/cow_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cow_pregnancy/providers/cow_provider.dart';
@@ -149,192 +150,34 @@ class CowDetailScreen extends ConsumerWidget {
                       );
                     },
                   ),
-                  if (cow.isInseminated && !cow.isPostBirth) ...[
-                    const SizedBox(height: 40),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 55,
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.teal,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  const SizedBox(height: 30),
+                  Row(
+                    children: [
+                      if (cow.isInseminated && !cow.isPostBirth)
+                        Expanded(
+                          child: _buildActionCard(
+                            context,
+                            icon: Icons.child_friendly,
+                            label: 'تسجيل ولادة',
+                            color: Colors.teal,
+                            onTap: () => _showBirthDialog(context, ref),
+                          ),
                         ),
-                        onPressed: () {
-                          // منع تسجيل الولادة المبكرة (أكثر من 20 يوم متبقي)
-                          final daysRemaining = AppSettings.pregnancyDays - cow.daysSinceInsemination;
-                          if (daysRemaining > 20) {
-                            showDialog(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: const Row(
-                                  children: [
-                                    Icon(Icons.warning_amber_rounded, color: Colors.orange),
-                                    SizedBox(width: 8),
-                                    Text('تسجيل ولادة مبكرة', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                                content: Text(
-                                  'هذه البقرة تحتاج $daysRemaining يوماً حتى موعد الولادة المتوقع.\n\n'
-                                  'لا يمكن تسجيل ولادة إلا خلال آخر 20 يوم من الحمل.\n\n'
-                                  'إذا ولدت فعلاً، استخدم زر التعديل ✏️ لتصحيح تاريخ التلقيح.',
-                                ),
-                                actions: [
-                                  FilledButton(
-                                    onPressed: () => Navigator.pop(ctx),
-                                    child: const Text('فهمت'),
-                                  ),
-                                ],
-                              ),
-                            );
-                            return;
-                          }
-
-                          DateTime selectedBirthDate = DateTime.now();
-                          String selectedGender = 'أنثى';
-                          final calfIdController = TextEditingController();
-                          int selectedCalfColorValue = Colors.blue.toARGB32();
-                          final List<Color> _colors = [
-                            Colors.blue, Colors.red, Colors.green, Colors.orange, 
-                            Colors.purple, Colors.teal, Colors.pink, Colors.brown
-                          ];
-
-                          showDialog(
-                            context: context,
-                            builder: (ctx) {
-                              return StatefulBuilder(
-                                builder: (context, setStateDialog) {
-                                  return AlertDialog(
-                                    title: const Text('تسجيل ولادة جديدة', style: TextStyle(fontWeight: FontWeight.bold)),
-                                    content: SingleChildScrollView(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          const Text('رقم المولود (اختياري):', style: TextStyle(fontWeight: FontWeight.bold)),
-                                          const SizedBox(height: 8),
-                                          TextField(
-                                            controller: calfIdController,
-                                            decoration: InputDecoration(
-                                              hintText: 'أدخل رقم المولود الجديد',
-                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                              prefixIcon: const Icon(Icons.tag),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 20),
-                                          const Text('تاريخ الولادة:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                          const SizedBox(height: 8),
-                                          ListTile(
-                                            shape: RoundedRectangleBorder(
-                                              side: BorderSide(color: Colors.grey.shade400),
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            leading: const Icon(Icons.calendar_today, color: Colors.teal),
-                                            title: Text(DateFormat('yyyy-MM-dd').format(selectedBirthDate)),
-                                            onTap: () async {
-                                              final date = await showDatePicker(
-                                                context: context,
-                                                initialDate: selectedBirthDate,
-                                                firstDate: cow.inseminationDate,
-                                                lastDate: DateTime.now(),
-                                              );
-                                              if (date != null) {
-                                                setStateDialog(() => selectedBirthDate = date);
-                                              }
-                                            },
-                                          ),
-                                          const SizedBox(height: 20),
-                                          const Text('جنس المولود:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                          const SizedBox(height: 12),
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: ChoiceChip(
-                                                  label: const Center(child: Text('أنثى 🐄', style: TextStyle(fontSize: 16))),
-                                                  selected: selectedGender == 'أنثى',
-                                                  selectedColor: Colors.pink.shade100,
-                                                  onSelected: (val) => setStateDialog(() => selectedGender = 'أنثى'),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              Expanded(
-                                                child: ChoiceChip(
-                                                  label: const Center(child: Text('ذكر 🐂', style: TextStyle(fontSize: 16))),
-                                                  selected: selectedGender == 'ذكر',
-                                                  selectedColor: Colors.blue.shade100,
-                                                  onSelected: (val) => setStateDialog(() => selectedGender = 'ذكر'),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 20),
-                                          const Text('اللون المميز للعجل/العجولة:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                          const SizedBox(height: 12),
-                                          Wrap(
-                                            spacing: 12,
-                                            runSpacing: 12,
-                                            children: _colors.map((color) {
-                                              bool isSelected = selectedCalfColorValue == color.toARGB32();
-                                              return GestureDetector(
-                                                onTap: () => setStateDialog(() => selectedCalfColorValue = color.toARGB32()),
-                                                child: AnimatedContainer(
-                                                  duration: const Duration(milliseconds: 200),
-                                                  width: isSelected ? 40 : 32,
-                                                  height: isSelected ? 40 : 32,
-                                                  decoration: BoxDecoration(
-                                                    color: color,
-                                                    shape: BoxShape.circle,
-                                                    boxShadow: isSelected ? [
-                                                      BoxShadow(color: color.withValues(alpha: 0.6), blurRadius: 10, spreadRadius: 2)
-                                                    ] : [],
-                                                    border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
-                                                  ),
-                                                ),
-                                              );
-                                            }).toList(),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    actions: [
-                                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-                                      FilledButton(
-                                        onPressed: () {
-                                          List<dynamic> newHistory = cow.history.toList();
-                                          String calfId = calfIdController.text.trim();
-                                          newHistory.add({
-                                            'title': 'تسجيل ولادة',
-                                            'date': selectedBirthDate.toIso8601String(),
-                                            'eventId': DateTime.now().millisecondsSinceEpoch.toString(),
-                                            'calfId': calfId.isEmpty ? null : calfId,
-                                            'calfColorValue': selectedCalfColorValue,
-                                            'note': 'ولادة بعد ${selectedBirthDate.difference(cow.inseminationDate).inDays} يوم - المولود: $selectedGender${calfId.isNotEmpty ? ' - رقم: $calfId' : ''}',
-                                          });
-                                          ref.read(cowProvider.notifier).updateCow(
-                                            cow.copyWith(birthDate: selectedBirthDate, history: newHistory)
-                                          );
-                                          Navigator.pop(ctx);
-                                          Navigator.pop(context);
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text('تم تسجيل ولادة ${calfId.isNotEmpty ? "المولود رقم $calfId" : "المولود"} بنجاح.'),
-                                              backgroundColor: Colors.green,
-                                            )
-                                          );
-                                        },
-                                        child: const Text('تأكيد وتسجيل', style: TextStyle(fontWeight: FontWeight.bold)),
-                                      ),
-                                    ],
-                                  );
-                                }
-                              );
-                            },
-                          );
-                        },
-                        icon: const Icon(Icons.child_friendly),
-                        label: const Text('تسجيل ولادة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      if (cow.isInseminated && !cow.isPostBirth) const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildActionCard(
+                          context,
+                          icon: Icons.science_outlined,
+                          label: 'تسجيل تلقيح',
+                          color: Colors.blueAccent,
+                          onTap: () => _showAddInseminationDialog(context, ref),
+                        ),
                       ),
-                    ),
+                    ],
+                  ),
+                  if (cow.isInseminated && !cow.isPostBirth) ...[
                   ],
+
                   const SizedBox(height: 40),
                   const Text('السجل التاريخي', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
@@ -396,6 +239,283 @@ class CowDetailScreen extends ConsumerWidget {
           ],
         )
       ],
+    );
+  }
+
+  Widget _buildActionCard(BuildContext context, {required IconData icon, required String label, required Color color, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 30),
+            const SizedBox(height: 8),
+            Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddInseminationDialog(BuildContext context, WidgetRef ref) {
+    // التحقق من مدة الحمل الحالية (أكثر من 5 أشهر يمنع تسجيل تلقيح جديد كحماية)
+    if (cow.isInseminated && !cow.isPostBirth && cow.daysSinceInsemination > 150) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.red),
+              SizedBox(width: 8),
+              Text('تنبيه: حمل متقدم', style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Text(
+            'البقرة ملقحة منذ أكثر من 5 أشهر (${cow.daysSinceInsemination} يوم).\n\n'
+            'لا يمكن تسجيل تلقيح جديد في هذه المرحلة. إذا كان هناك خطأ في التاريخ السابق، يرجى تعديله من زر التعديل العلوي ✏️.',
+          ),
+          actions: [
+            FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('فهمت')),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final bullController = TextEditingController(text: cow.bullId);
+    DateTime selectedDate = DateTime.now();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          title: const Text('تسجيل تلقيح جديد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('سيتم تحديث تاريخ التلقيح الحالي للبقرة لبدء دورة حمل جديدة.', style: TextStyle(fontSize: 13, color: Colors.grey)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: bullController,
+                decoration: InputDecoration(
+                  labelText: 'اسم/رقم الطلوقة',
+                  prefixIcon: const Icon(Icons.pets),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              CustomDatePickerField(
+                label: 'تاريخ التلقيح',
+                initialDate: selectedDate,
+                onDateSelected: (date) => selectedDate = date,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            FilledButton(
+              onPressed: () {
+                List<dynamic> newHistory = cow.history.toList();
+                
+                // إذا كانت البقرة ملقحة سابقاً ولم تلد، نعتبر التلقيح السابق فاشلاً
+                if (cow.isInseminated && !cow.isPostBirth) {
+                  newHistory.add({
+                    'title': 'فشل تلقيح سابق ❌',
+                    'date': DateTime.now().toIso8601String(),
+                    'eventId': DateTime.now().millisecondsSinceEpoch.toString(),
+                    'note': 'تم تسجيل تلقيح جديد بسبب عدم ثبوت الحمل السابق بعد ${cow.daysSinceInsemination} يوم.',
+                  });
+                }
+
+                newHistory.add({
+                  'title': 'تلقيح جديد',
+                  'date': selectedDate.toIso8601String(),
+                  'eventId': (DateTime.now().millisecondsSinceEpoch + 1).toString(),
+                  'note': 'تلقيح جديد من الطلوقة: ${bullController.text}',
+                });
+                
+                // Update the cow's main insemination date and status
+                ref.read(cowProvider.notifier).updateCow(cow.copyWith(
+                  inseminationDate: selectedDate,
+                  bullId: bullController.text,
+                  birthDate: null, // Reset birth date as it's a new pregnancy cycle
+                  isInseminated: true,
+                  history: newHistory,
+                ));
+                
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('تم تسجيل التلقيح الجديد وبدء دورة الحمل'), backgroundColor: Colors.blueAccent),
+                );
+              },
+              child: const Text('تأكيد التلقيح'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBirthDialog(BuildContext context, WidgetRef ref) {
+    // التحقق من مدة الحمل (أقل من 260 يوم يمنع تسجيل الولادة)
+    final daysSinceInsemination = cow.daysSinceInsemination;
+    if (daysSinceInsemination < 260) {
+      final daysRemainingToThreshold = 260 - daysSinceInsemination;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('تنبيه: حمل مبكر جداً', style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Text(
+            'هذه البقرة ملقحة منذ $daysSinceInsemination يوماً فقط.\n\n'
+            'يتبقى $daysRemainingToThreshold يوماً للوصول إلى الحد الأدنى للولادة (260 يوم).\n\n'
+            'إذا ولدت البقرة فعلاً، يرجى تعديل "تاريخ التلقيح" أولاً من زر التعديل ✏️ في الأعلى.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('فهمت'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    DateTime selectedBirthDate = DateTime.now();
+    String selectedGender = 'أنثى';
+    final calfIdController = TextEditingController();
+    int selectedCalfColorValue = Colors.blue.toARGB32();
+    final List<Color> _colors = [
+      Colors.blue, Colors.red, Colors.green, Colors.orange,
+      Colors.purple, Colors.teal, Colors.pink, Colors.brown
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          title: const Text('تسجيل ولادة جديدة', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('رقم المولود (اختياري):', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: calfIdController,
+                  decoration: InputDecoration(
+                    hintText: 'أدخل رقم المولود الجديد',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    prefixIcon: const Icon(Icons.tag),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text('تاريخ الولادة:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                CustomDatePickerField(
+                  label: 'تاريخ الولادة',
+                  initialDate: selectedBirthDate,
+                  firstDate: cow.inseminationDate,
+                  onDateSelected: (date) => selectedBirthDate = date,
+                ),
+                const SizedBox(height: 20),
+                const Text('جنس المولود:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ChoiceChip(
+                        label: const Center(child: Text('أنثى 🐄', style: TextStyle(fontSize: 16))),
+                        selected: selectedGender == 'أنثى',
+                        selectedColor: Colors.pink.shade100,
+                        onSelected: (val) => setStateDialog(() => selectedGender = 'أنثى'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ChoiceChip(
+                        label: const Center(child: Text('ذكر 🐂', style: TextStyle(fontSize: 16))),
+                        selected: selectedGender == 'ذكر',
+                        selectedColor: Colors.blue.shade100,
+                        onSelected: (val) => setStateDialog(() => selectedGender = 'ذكر'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text('اللون المميز للعجل/العجولة:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: _colors.map((color) {
+                    bool isSelected = selectedCalfColorValue == color.toARGB32();
+                    return GestureDetector(
+                      onTap: () => setStateDialog(() => selectedCalfColorValue = color.toARGB32()),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: isSelected ? 40 : 32,
+                        height: isSelected ? 40 : 32,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          boxShadow: isSelected ? [
+                            BoxShadow(color: color.withValues(alpha: 0.6), blurRadius: 10, spreadRadius: 2)
+                          ] : [],
+                          border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            FilledButton(
+              onPressed: () {
+                List<dynamic> newHistory = cow.history.toList();
+                String calfId = calfIdController.text.trim();
+                newHistory.add({
+                  'title': 'تسجيل ولادة',
+                  'date': selectedBirthDate.toIso8601String(),
+                  'eventId': DateTime.now().millisecondsSinceEpoch.toString(),
+                  'calfId': calfId.isEmpty ? null : calfId,
+                  'calfColorValue': selectedCalfColorValue,
+                  'note': 'ولادة بعد ${selectedBirthDate.difference(cow.inseminationDate).inDays} يوم - المولود: $selectedGender${calfId.isNotEmpty ? ' - رقم: $calfId' : ''}',
+                });
+                ref.read(cowProvider.notifier).updateCow(
+                  cow.copyWith(birthDate: selectedBirthDate, history: newHistory)
+                );
+                Navigator.pop(ctx);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('تم تسجيل ولادة ${calfId.isNotEmpty ? "المولود رقم $calfId" : "المولود"} بنجاح.'),
+                    backgroundColor: Colors.green,
+                  )
+                );
+              },
+              child: const Text('تأكيد وتسجيل', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
