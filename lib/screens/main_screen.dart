@@ -14,13 +14,13 @@ class MainScreen extends ConsumerStatefulWidget {
 }
 
 class _MainScreenState extends ConsumerState<MainScreen> {
-  int _selectedIndex = 3; // Default to Dashboard
+  int _selectedIndex = 0; // Default to Dashboard
 
   final List<Widget> _screens = [
-    const PostBirthScreen(),
-    const CalvesScreen(),
-    const CowsListScreen(),
     const SummaryScreen(),
+    const CowsListScreen(),
+    const CalvesScreen(),
+    const PostBirthScreen(),
   ];
 
   @override
@@ -69,14 +69,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
               unselectedLabelStyle: const TextStyle(fontSize: 10),
               items: const [
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.medical_services_outlined),
-                  activeIcon: Icon(Icons.medical_services),
-                  label: 'بعد الولادة',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.child_care_outlined),
-                  activeIcon: Icon(Icons.child_care),
-                  label: 'العجول',
+                  icon: Icon(Icons.dashboard_outlined),
+                  activeIcon: Icon(Icons.dashboard),
+                  label: 'لوحة التحكم',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(Icons.list_alt_outlined),
@@ -84,9 +79,14 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                   label: 'إدارة الأبقار',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.dashboard_outlined),
-                  activeIcon: Icon(Icons.dashboard),
-                  label: 'لوحة التحكم',
+                  icon: Icon(Icons.child_care_outlined),
+                  activeIcon: Icon(Icons.child_care),
+                  label: 'العجول',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.medical_services_outlined),
+                  activeIcon: Icon(Icons.medical_services),
+                  label: 'بعد الولادة',
                 ),
               ],
             ),

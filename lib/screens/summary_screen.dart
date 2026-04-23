@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cow_pregnancy/providers/cow_provider.dart';
+import 'package:cow_pregnancy/providers/alerts_provider.dart';
 import 'package:cow_pregnancy/widgets/stat_card.dart';
-import 'package:cow_pregnancy/utils/app_settings.dart';
 import 'package:cow_pregnancy/models/cow_model.dart';
 import 'package:cow_pregnancy/screens/settings_screen.dart';
+import 'package:cow_pregnancy/screens/cow_detail_screen.dart';
 
 class SummaryScreen extends ConsumerWidget {
   const SummaryScreen({super.key});
@@ -12,11 +13,11 @@ class SummaryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cows = ref.watch(cowProvider);
+    final smartAlerts = ref.watch(alertsProvider);
     
     final int totalCows = cows.length;
     final int pregnantCount = cows.where((c) => c.isInseminated && !c.isPostBirth && c.daysSinceInsemination > 60).length;
     final int postBirthCount = cows.where((c) => c.isPostBirth).length;
-    final int lateForInseminationCount = cows.where((c) => c.isPostBirth && c.daysSinceBirth >= AppSettings.recoveryDays).length;
     
     // Calf counting logic
     int totalCalves = 0;
@@ -37,55 +38,9 @@ class SummaryScreen extends ConsumerWidget {
       }
     }
 
-    // Alerts logic
-    final List<Map<String, dynamic>> alerts = [];
-    for (var cow in cows) {
-      if (cow.isPostBirth) {
-        if (cow.daysSinceBirth >= 60) {
-          alerts.add({
-            'type': 'late_insemination',
-            'cow': cow,
-            'message': 'البقرة #${cow.id} تمت الولادة قبل ${cow.daysSinceBirth} يوم ولم تُلقح بعد.',
-            'color': Colors.red,
-            'icon': Icons.warning_amber_rounded,
-          });
-        }
-      } else if (cow.isInseminated) {
-        int daysRemaining = AppSettings.pregnancyDays - cow.daysSinceInsemination;
-        if (daysRemaining <= 10 && daysRemaining >= -5) {
-          alerts.add({
-            'type': 'near_birth',
-            'cow': cow,
-            'message': 'البقرة #${cow.id} قريبة من الولادة (بقي أقل من $daysRemaining أيام).',
-            'color': Colors.orange,
-            'icon': Icons.child_friendly,
-          });
-        } else if (cow.daysSinceInsemination >= 215 && cow.daysSinceInsemination <= 225) {
-          alerts.add({
-            'type': 'drying',
-            'cow': cow,
-            'message': 'البقرة #${cow.id} حان موعد التنشيف (اليوم ${cow.daysSinceInsemination}).',
-            'color': Colors.blue,
-            'icon': Icons.opacity_outlined,
-          });
-        }
-      } else {
-        // Not inseminated, check for heat
-        if (cow.daysSinceInsemination >= AppSettings.heatCycleDays - 2) {
-          alerts.add({
-            'type': 'heat',
-            'cow': cow,
-            'message': 'البقرة #${cow.id} موعد شبق متوقع (اليوم ${cow.daysSinceInsemination}).',
-            'color': Colors.pink,
-            'icon': Icons.favorite_border,
-          });
-        }
-      }
-    }
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('لوحة التحكم', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('اللوحة الذكية', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
           IconButton(
@@ -103,33 +58,65 @@ class SummaryScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'نظرة عامة على المزرعة',
+              'نظرة عامة',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blueGrey),
             ),
             const SizedBox(height: 20),
             GridView.count(
               shrinkWrap: true,
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 1.3,
+              crossAxisCount: 3,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1.0,
               physics: const NeverScrollableScrollPhysics(),
               children: [
-                StatCard(title: 'إجمالي الأبقار', count: totalCows, color: Colors.blue, delayMs: 0),
+                StatCard(title: 'إجمالي القطيع', count: totalCows, color: Colors.blue, delayMs: 0),
                 StatCard(title: 'حوامل', count: pregnantCount, color: Colors.green, delayMs: 100),
                 StatCard(title: 'بعد الولادة', count: postBirthCount, color: Colors.teal, delayMs: 200),
-                StatCard(title: 'تأخرت عن التلقيح', count: lateForInseminationCount, color: Colors.red, delayMs: 300),
               ],
             ),
-            if (alerts.isNotEmpty) ...[
-              const SizedBox(height: 30),
-              const Text(
-                'تنبيهات هامة',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.redAccent),
-              ),
-              const SizedBox(height: 16),
-              ...alerts.map((alert) => _buildAlertItem(context, alert)),
-            ],
+            
+            const SizedBox(height: 30),
+            Row(
+              children: [
+                const Icon(Icons.notifications_active, color: Colors.redAccent),
+                const SizedBox(width: 8),
+                const Text(
+                  'التنبيهات والمهام',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.redAccent),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text('${smartAlerts.length} مهام', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                )
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (smartAlerts.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(30),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                ),
+                child: const Column(
+                  children: [
+                    Icon(Icons.check_circle_outline, color: Colors.green, size: 50),
+                    SizedBox(height: 10),
+                    Text('لا توجد مهام حالياً، القطيع بخير!', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 16)),
+                  ],
+                ),
+              )
+            else
+              ...smartAlerts.map((alert) => _buildSmartAlertCard(context, alert, cows)),
+              
             const SizedBox(height: 30),
             const Text(
               'إحصائيات المواليد',
@@ -153,7 +140,7 @@ class SummaryScreen extends ConsumerWidget {
                     children: [
                       Expanded(child: _buildGenderStat('عجول (ذكر)', maleCalves, Colors.blue.shade300, Icons.male)),
                       const SizedBox(width: 20),
-                      Expanded(child: _buildGenderStat('عجولات (أنثى)', femaleCalves, Colors.pink.shade300, Icons.female)),
+                      Expanded(child: _buildGenderStat('عجلات (أنثى)', femaleCalves, Colors.pink.shade300, Icons.female)),
                     ],
                   )
                 ],
@@ -166,41 +153,121 @@ class SummaryScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildAlertItem(BuildContext context, Map<String, dynamic> alert) {
-    final Cow cow = alert['cow'];
+  Widget _buildSmartAlertCard(BuildContext context, SmartAlert alert, List<Cow> cows) {
+    Color cardColor;
+    IconData icon;
+    
+    switch (alert.type) {
+      case AlertType.birth:
+        cardColor = Colors.orange;
+        icon = Icons.child_friendly;
+        break;
+      case AlertType.heat:
+        cardColor = Colors.pink;
+        icon = Icons.favorite_border;
+        break;
+      case AlertType.lateInsemination:
+        cardColor = Colors.redAccent;
+        icon = Icons.warning_amber_rounded;
+        break;
+      case AlertType.drying:
+        cardColor = Colors.blue;
+        icon = Icons.opacity_outlined;
+        break;
+      case AlertType.calfVaccine:
+        cardColor = Colors.teal;
+        icon = Icons.vaccines;
+        break;
+      case AlertType.recovery:
+        cardColor = Colors.green;
+        icon = Icons.health_and_safety;
+        break;
+    }
+
+    if (alert.severity == AlertSeverity.high) cardColor = Colors.redAccent;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: alert['color'].withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: alert['color'].withValues(alpha: 0.3)),
+        color: cardColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: cardColor.withValues(alpha: 0.3)),
       ),
-      child: Row(
-        children: [
-          Icon(alert['icon'], color: alert['color'], size: 30),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            // Find cow and navigate
+            try {
+              final cow = cows.firstWhere((c) => c.uniqueKey == alert.relatedCowKey);
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => CowDetailScreen(cow: cow),
+              ));
+            } catch (e) {
+              // Cow not found, maybe deleted
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('البقرة غير موجودة!')),
+              );
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 12, height: 12,
-                      decoration: BoxDecoration(color: cow.color, shape: BoxShape.circle),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      alert['message'],
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                  ],
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: cardColor.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: cardColor, size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              alert.title,
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: cardColor),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (alert.severity == AlertSeverity.high)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)),
+                              child: const Text('عاجل', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                            )
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        alert.description,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.arrow_forward_ios, size: 12, color: cardColor),
+                          const SizedBox(width: 4),
+                          Text('اضغط لاتخاذ إجراء', style: TextStyle(fontSize: 12, color: cardColor, fontWeight: FontWeight.bold)),
+                        ],
+                      )
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

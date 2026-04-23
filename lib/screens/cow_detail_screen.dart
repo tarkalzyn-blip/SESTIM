@@ -304,6 +304,7 @@ class CowDetailScreen extends ConsumerWidget {
                                           newHistory.add({
                                             'title': 'تسجيل ولادة',
                                             'date': selectedBirthDate.toIso8601String(),
+                                            'eventId': DateTime.now().millisecondsSinceEpoch.toString(),
                                             'calfId': calfId.isEmpty ? null : calfId,
                                             'calfColorValue': selectedCalfColorValue,
                                             'note': 'ولادة بعد ${selectedBirthDate.difference(cow.inseminationDate).inDays} يوم - المولود: $selectedGender${calfId.isNotEmpty ? ' - رقم: $calfId' : ''}',
