@@ -5,6 +5,7 @@ import 'package:cow_pregnancy/models/cow_model.dart';
 import 'package:cow_pregnancy/utils/app_settings.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
+import 'package:app_settings/app_settings.dart' as ExternalSettings;
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -139,12 +140,35 @@ class NotificationService {
             channelDescription: 'إشعارات مواعيد الحمل للأبقار',
             importance: Importance.max,
             priority: Priority.high,
+            largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       );
     } catch (e) {
       debugPrint('Notification Zoned Schedule Error: $e');
+    }
+  }
+
+  Future<void> scheduleCustomNotification({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime scheduledDate,
+  }) async {
+    await _schedule(
+      id: id,
+      title: title,
+      body: body,
+      scheduledDate: scheduledDate,
+    );
+  }
+
+  Future<void> cancelCustomNotification(int id) async {
+    try {
+      await _notificationsPlugin.cancel(id: id);
+    } catch (e) {
+      debugPrint('Notification Cancel Error: $e');
     }
   }
 
@@ -169,7 +193,7 @@ class NotificationService {
       if (totalCount == 0) return;
 
       final now = DateTime.now();
-      var scheduledDate = DateTime(now.year, now.month, now.day, AppSettings.notificationHour, 0, 0);
+      var scheduledDate = DateTime(now.year, now.month, now.day, AppSettings.notificationHour, AppSettings.notificationMinute, 0);
       if (scheduledDate.isBefore(now)) {
         scheduledDate = scheduledDate.add(const Duration(days: 1));
       }
@@ -193,6 +217,7 @@ class NotificationService {
             channelDescription: 'إشعار صباحي يومي بملخص مهام المزرعة',
             importance: Importance.high,
             priority: Priority.high,
+            largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
             styleInformation: BigTextStyleInformation(''),
           ),
         ),
@@ -201,6 +226,17 @@ class NotificationService {
       );
     } catch (e) {
       debugPrint('Daily Summary Notification Error: $e');
+    }
+  }
+
+  Future<void> openNotificationSettings() async {
+    try {
+      // فتح إعدادات الإشعارات الخاصة بالتطبيق
+      await ExternalSettings.AppSettings.openAppSettings(
+        type: ExternalSettings.AppSettingsType.notification,
+      );
+    } catch (e) {
+      debugPrint('Error opening notification settings: $e');
     }
   }
 }

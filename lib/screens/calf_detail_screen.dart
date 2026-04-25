@@ -32,23 +32,34 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setStateDialog) => AlertDialog(
-          title: const Text('استبعاد العجل', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+          title: const Text(
+            'استبعاد العجل',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('سبب الاستبعاد:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text(
+                  'سبب الاستبعاد:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: selectedReason,
+                  initialValue: selectedReason,
                   decoration: InputDecoration(
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   items: const [
                     DropdownMenuItem(value: 'بيع', child: Text('💰 بيع')),
                     DropdownMenuItem(value: 'وفاة', child: Text('☠️ وفاة')),
-                    DropdownMenuItem(value: 'نقل', child: Text('🔄 نقل لمزرعة أخرى')),
+                    DropdownMenuItem(
+                      value: 'نقل',
+                      child: Text('🔄 نقل لمزرعة أخرى'),
+                    ),
                   ],
                   onChanged: (val) {
                     setStateDialog(() => selectedReason = val!);
@@ -62,7 +73,9 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
                     decoration: InputDecoration(
                       labelText: 'سعر البيع',
                       prefixIcon: const Icon(Icons.attach_money),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
                 ],
@@ -76,7 +89,10 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء'),
+            ),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: Colors.red.shade900),
               onPressed: () {
@@ -84,12 +100,22 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
                 showDialog(
                   context: context,
                   builder: (_) => AlertDialog(
-                    title: const Text('⚠️ تأكيد الحذف', style: TextStyle(color: Colors.red)),
-                    content: const Text('سيتم حذف سجل هذا العجل نهائياً ولا يمكن التراجع. هل أنت متأكد؟'),
+                    title: const Text(
+                      '⚠️ تأكيد الحذف',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                    content: const Text(
+                      'سيتم حذف سجل هذا العجل نهائياً ولا يمكن التراجع. هل أنت متأكد؟',
+                    ),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('إلغاء'),
+                      ),
                       FilledButton(
-                        style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.red,
+                        ),
                         onPressed: () {
                           Navigator.pop(context);
                           _processDelete();
@@ -105,7 +131,12 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: Colors.red),
               onPressed: () {
-                _processExit(selectedReason, priceController.text, noteController.text, exitDate);
+                _processExit(
+                  selectedReason,
+                  priceController.text,
+                  noteController.text,
+                  exitDate,
+                );
                 Navigator.pop(ctx);
               },
               child: const Text('تأكيد الاستبعاد'),
@@ -122,13 +153,15 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
       return;
     }
     final cows = ref.read(cowProvider);
-    final cowIndex = cows.indexWhere((c) => c.uniqueKey == _currentCalfData['motherUniqueKey']);
-    
+    final cowIndex = cows.indexWhere(
+      (c) => c.uniqueKey == _currentCalfData['motherUniqueKey'],
+    );
+
     if (cowIndex != -1) {
       final cow = cows[cowIndex];
       final originalDate = _currentCalfData['originalEventDate'];
       final storedEventId = _currentCalfData['eventId']?.toString();
-      
+
       final newHistory = cow.history.map((event) {
         if (_matchEvent(event, storedEventId, originalDate)) {
           final newEvent = Map<String, dynamic>.from(event);
@@ -137,21 +170,23 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
           newEvent['exitPrice'] = price;
           newEvent['exitNote'] = note;
           newEvent['exitDate'] = date.toIso8601String();
-          
+
           setState(() {
             _currentCalfData['isExited'] = true;
             _currentCalfData['exitReason'] = reason;
             _currentCalfData['exitPrice'] = price;
             _currentCalfData['exitDate'] = newEvent['exitDate'];
           });
-          
+
           return newEvent;
         }
         return event;
       }).toList();
-      
-      ref.read(cowProvider.notifier).updateCow(cow.copyWith(history: newHistory));
-      
+
+      ref
+          .read(cowProvider.notifier)
+          .updateCow(cow.copyWith(history: newHistory));
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تم استبعاد العجل بنجاح (السبب: $reason)')),
       );
@@ -160,7 +195,9 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
 
   void _processDelete() {
     final cows = ref.read(cowProvider);
-    final cowIndex = cows.indexWhere((c) => c.uniqueKey == _currentCalfData['motherUniqueKey']);
+    final cowIndex = cows.indexWhere(
+      (c) => c.uniqueKey == _currentCalfData['motherUniqueKey'],
+    );
     if (cowIndex != -1) {
       final cow = cows[cowIndex];
       final originalDate = _currentCalfData['originalEventDate'];
@@ -168,9 +205,14 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
       final newHistory = cow.history
           .where((event) => !_matchEvent(event, storedEventId, originalDate))
           .toList();
-      ref.read(cowProvider.notifier).updateCow(cow.copyWith(history: newHistory));
+      ref
+          .read(cowProvider.notifier)
+          .updateCow(cow.copyWith(history: newHistory));
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم حذف سجل العجل بنجاح'), backgroundColor: Colors.red),
+        const SnackBar(
+          content: Text('تم حذف سجل العجل بنجاح'),
+          backgroundColor: Colors.red,
+        ),
       );
       Navigator.pop(context);
     }
@@ -180,7 +222,8 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
     final title = event['title']?.toString() ?? '';
     if (title != 'تسجيل ولادة' && title != 'تسجيل ولادة سابقة') return false;
     final evId = event['eventId']?.toString();
-    if (evId != null && storedEventId != null && evId == storedEventId) return true;
+    if (evId != null && storedEventId != null && evId == storedEventId)
+      return true;
     if (event['date']?.toString() == originalDate) return true;
     try {
       final a = DateTime.parse(event['date'].toString());
@@ -197,7 +240,10 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setStateDialog) => AlertDialog(
-          title: const Text('تسجيل وزن جديد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+          title: const Text(
+            'تسجيل وزن جديد',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -208,7 +254,9 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
                   labelText: 'الوزن',
                   suffixText: 'كغ',
                   prefixIcon: const Icon(Icons.monitor_weight),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -220,11 +268,17 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء'),
+            ),
             FilledButton(
               onPressed: () {
                 if (weightController.text.isNotEmpty) {
-                  _processAddWeight(double.tryParse(weightController.text) ?? 0, selectedDate);
+                  _processAddWeight(
+                    double.tryParse(weightController.text) ?? 0,
+                    selectedDate,
+                  );
                   Navigator.pop(ctx);
                 }
               },
@@ -243,7 +297,10 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setStateDialog) => AlertDialog(
-          title: const Text('تسجيل لقاح جديد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
+          title: const Text(
+            'تسجيل لقاح جديد',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -252,7 +309,9 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
                 decoration: InputDecoration(
                   labelText: 'اسم اللقاح',
                   prefixIcon: const Icon(Icons.vaccines),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -264,11 +323,17 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء'),
+            ),
             FilledButton(
               onPressed: () {
                 if (vaccineController.text.isNotEmpty) {
-                  _processAddVaccine(vaccineController.text.trim(), selectedDate);
+                  _processAddVaccine(
+                    vaccineController.text.trim(),
+                    selectedDate,
+                  );
                   Navigator.pop(ctx);
                 }
               },
@@ -283,8 +348,10 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
 
   void _processAddVaccine(String vaccineName, DateTime date) {
     final cows = ref.read(cowProvider);
-    final cowIndex = cows.indexWhere((c) => c.uniqueKey == _currentCalfData['motherUniqueKey']);
-    
+    final cowIndex = cows.indexWhere(
+      (c) => c.uniqueKey == _currentCalfData['motherUniqueKey'],
+    );
+
     if (cowIndex != -1) {
       final cow = cows[cowIndex];
       final originalDate = _currentCalfData['originalEventDate'];
@@ -293,25 +360,27 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
         if (_matchEvent(event, storedEventId, originalDate)) {
           final newEvent = Map<String, dynamic>.from(event);
           List<dynamic> vaccines = List.from(newEvent['vaccines'] ?? []);
-          vaccines.add({
-            'date': date.toIso8601String(),
-            'name': vaccineName,
-          });
+          vaccines.add({'date': date.toIso8601String(), 'name': vaccineName});
           newEvent['vaccines'] = vaccines;
-          
+
           setState(() {
             _currentCalfData['vaccines'] = vaccines;
           });
-          
+
           return newEvent;
         }
         return event;
       }).toList();
-      
-      ref.read(cowProvider.notifier).updateCow(cow.copyWith(history: newHistory));
-      
+
+      ref
+          .read(cowProvider.notifier)
+          .updateCow(cow.copyWith(history: newHistory));
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم تسجيل اللقاح بنجاح'), backgroundColor: Colors.teal),
+        const SnackBar(
+          content: Text('تم تسجيل اللقاح بنجاح'),
+          backgroundColor: Colors.teal,
+        ),
       );
     }
   }
@@ -320,8 +389,10 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
     if (weight <= 0) return;
 
     final cows = ref.read(cowProvider);
-    final cowIndex = cows.indexWhere((c) => c.uniqueKey == _currentCalfData['motherUniqueKey']);
-    
+    final cowIndex = cows.indexWhere(
+      (c) => c.uniqueKey == _currentCalfData['motherUniqueKey'],
+    );
+
     if (cowIndex != -1) {
       final cow = cows[cowIndex];
       final originalDate = _currentCalfData['originalEventDate'];
@@ -330,26 +401,25 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
         if (_matchEvent(event, storedEventId, originalDate)) {
           final newEvent = Map<String, dynamic>.from(event);
           List<dynamic> weights = List.from(newEvent['weights'] ?? []);
-          weights.add({
-            'date': date.toIso8601String(),
-            'weight': weight,
-          });
+          weights.add({'date': date.toIso8601String(), 'weight': weight});
           newEvent['weights'] = weights;
-          
+
           setState(() {
             _currentCalfData['weights'] = weights;
           });
-          
+
           return newEvent;
         }
         return event;
       }).toList();
-      
-      ref.read(cowProvider.notifier).updateCow(cow.copyWith(history: newHistory));
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم تسجيل الوزن بنجاح')),
-      );
+
+      ref
+          .read(cowProvider.notifier)
+          .updateCow(cow.copyWith(history: newHistory));
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تم تسجيل الوزن بنجاح')));
     }
   }
 
@@ -361,7 +431,10 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('الملف الشخصي: ${_currentCalfData['calfId'] ?? 'عجل'}', style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(
+          'الملف الشخصي: ${_currentCalfData['calfId'] ?? 'عجل'}',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -386,7 +459,10 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
                     Expanded(
                       child: Text(
                         'هذا العجل مستبعد! (السبب: ${_currentCalfData['exitReason']})',
-                        style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
@@ -400,7 +476,11 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
-                  BoxShadow(color: calfColor.withValues(alpha: 0.2), blurRadius: 15, spreadRadius: 2),
+                  BoxShadow(
+                    color: calfColor.withValues(alpha: 0.2),
+                    blurRadius: 15,
+                    spreadRadius: 2,
+                  ),
                 ],
                 border: Border.all(color: calfColor.withValues(alpha: 0.5)),
               ),
@@ -412,37 +492,77 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
                       color: calfColor.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(isMale ? Icons.male : Icons.female, size: 60, color: calfColor),
+                    child: Icon(
+                      isMale ? Icons.male : Icons.female,
+                      size: 60,
+                      color: calfColor,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    _currentCalfData['calfId'] != null ? 'رقم العجل: ${_currentCalfData['calfId']}' : 'بدون رقم',
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    _currentCalfData['calfId'] != null
+                        ? 'رقم العجل: ${_currentCalfData['calfId']}'
+                        : 'بدون رقم',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   Text(
                     isMale ? 'ذكر' : 'أنثى',
-                    style: TextStyle(fontSize: 16, color: calfColor, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: calfColor,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 20),
 
             // Details
-            _buildDetailCard(Icons.cake, 'تاريخ الولادة', DateFormat('yyyy/MM/dd').format(_currentCalfData['date'])),
-            _buildDetailCard(Icons.female, 'رقم الأم', '#${_currentCalfData['motherId']}'),
-            
-            if (isExited && _currentCalfData['exitPrice'] != null && _currentCalfData['exitPrice'].toString().isNotEmpty)
-              _buildDetailCard(Icons.attach_money, 'سعر البيع', '${_currentCalfData['exitPrice']}'),
-            
+            _buildDetailCard(
+              Icons.cake,
+              'تاريخ الولادة',
+              DateFormat('yyyy/MM/dd').format(_currentCalfData['date']),
+            ),
+            _buildDetailCard(
+              Icons.female,
+              'رقم الأم',
+              '#${_currentCalfData['motherId']}',
+            ),
+
+            if (isExited &&
+                _currentCalfData['exitPrice'] != null &&
+                _currentCalfData['exitPrice'].toString().isNotEmpty)
+              _buildDetailCard(
+                Icons.attach_money,
+                'سعر البيع',
+                '${_currentCalfData['exitPrice']}',
+              ),
+
             if (isExited && _currentCalfData['exitDate'] != null)
-              _buildDetailCard(Icons.calendar_today, 'تاريخ الاستبعاد', DateFormat('yyyy/MM/dd').format(DateTime.parse(_currentCalfData['exitDate']))),
+              _buildDetailCard(
+                Icons.calendar_today,
+                'تاريخ الاستبعاد',
+                DateFormat(
+                  'yyyy/MM/dd',
+                ).format(DateTime.parse(_currentCalfData['exitDate'])),
+              ),
 
             const SizedBox(height: 30),
-            
+
             // Future Features placeholders
-            const Text('أدوات العناية', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+            const Text(
+              'أدوات العناية',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.blueGrey,
+              ),
+            ),
             const SizedBox(height: 10),
             Row(
               children: [
@@ -450,7 +570,11 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
                   child: InkWell(
                     onTap: isExited ? null : _showAddWeightDialog,
                     borderRadius: BorderRadius.circular(15),
-                    child: _buildActionBtn(Icons.monitor_weight_outlined, 'تسجيل وزن', Colors.blue),
+                    child: _buildActionBtn(
+                      Icons.monitor_weight_outlined,
+                      'تسجيل وزن',
+                      Colors.blue,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -458,7 +582,11 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
                   child: InkWell(
                     onTap: isExited ? null : _showAddVaccineDialog,
                     borderRadius: BorderRadius.circular(15),
-                    child: _buildActionBtn(Icons.vaccines_outlined, 'تسجيل لقاح', Colors.teal),
+                    child: _buildActionBtn(
+                      Icons.vaccines_outlined,
+                      'تسجيل لقاح',
+                      Colors.teal,
+                    ),
                   ),
                 ),
               ],
@@ -467,16 +595,37 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
             const SizedBox(height: 20),
 
             // Weights History
-            if (_currentCalfData['weights'] != null && (_currentCalfData['weights'] as List).isNotEmpty) ...[
-              const Text('سجل الأوزان', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+            if (_currentCalfData['weights'] != null &&
+                (_currentCalfData['weights'] as List).isNotEmpty) ...[
+              const Text(
+                'سجل الأوزان',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blueGrey,
+                ),
+              ),
               const SizedBox(height: 10),
               ...(_currentCalfData['weights'] as List).reversed.map((w) {
                 final date = DateTime.parse(w['date']);
                 return Card(
                   margin: const EdgeInsets.only(bottom: 8),
                   child: ListTile(
-                    leading: const CircleAvatar(backgroundColor: Colors.blue, child: Icon(Icons.monitor_weight, color: Colors.white, size: 20)),
-                    title: Text('${w['weight']} كغ', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    leading: const CircleAvatar(
+                      backgroundColor: Colors.blue,
+                      child: Icon(
+                        Icons.monitor_weight,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    title: Text(
+                      '${w['weight']} كغ',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
                     subtitle: Text(DateFormat('yyyy/MM/dd HH:mm').format(date)),
                   ),
                 );
@@ -485,16 +634,34 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
             ],
 
             // Vaccines History
-            if (_currentCalfData['vaccines'] != null && (_currentCalfData['vaccines'] as List).isNotEmpty) ...[
-              const Text('سجل اللقاحات', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+            if (_currentCalfData['vaccines'] != null &&
+                (_currentCalfData['vaccines'] as List).isNotEmpty) ...[
+              const Text(
+                'سجل اللقاحات',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blueGrey,
+                ),
+              ),
               const SizedBox(height: 10),
               ...(_currentCalfData['vaccines'] as List).reversed.map((v) {
                 final date = DateTime.parse(v['date']);
                 return Card(
                   margin: const EdgeInsets.only(bottom: 8),
                   child: ListTile(
-                    leading: const CircleAvatar(backgroundColor: Colors.teal, child: Icon(Icons.vaccines, color: Colors.white, size: 20)),
-                    title: Text('${v['name']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    leading: const CircleAvatar(
+                      backgroundColor: Colors.teal,
+                      child: Icon(
+                        Icons.vaccines,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    title: Text(
+                      '${v['name']}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     subtitle: Text(DateFormat('yyyy/MM/dd').format(date)),
                   ),
                 );
@@ -512,7 +679,9 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.redAccent,
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
                 ),
                 onPressed: _showExitDialog,
               ),
@@ -528,8 +697,14 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         leading: Icon(icon, color: Colors.blueGrey),
-        title: Text(title, style: const TextStyle(fontSize: 14, color: Colors.grey)),
-        trailing: Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        title: Text(
+          title,
+          style: const TextStyle(fontSize: 14, color: Colors.grey),
+        ),
+        trailing: Text(
+          value,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }
@@ -546,7 +721,10 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
         children: [
           Icon(icon, color: color, size: 30),
           const SizedBox(height: 8),
-          Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+          Text(
+            label,
+            style: TextStyle(color: color, fontWeight: FontWeight.bold),
+          ),
         ],
       ),
     );

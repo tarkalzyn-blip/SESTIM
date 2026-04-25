@@ -20,4 +20,10 @@ class AppSettings {
 
   static int get notificationHour => _box.get('notificationHour', defaultValue: 8);
   static Future<void> setNotificationHour(int val) => _box.put('notificationHour', val);
+
+  static int get notificationMinute => _box.get('notificationMinute', defaultValue: 0);
+  static Future<void> setNotificationMinute(int val) => _box.put('notificationMinute', val);
+
+  static String get fontFamily => _box.get('fontFamily', defaultValue: 'Cairo');
+  static Future<void> setFontFamily(String val) => _box.put('fontFamily', val);
 }

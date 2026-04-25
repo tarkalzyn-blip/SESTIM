@@ -12,6 +12,7 @@ class Cow {
   final List<dynamic> history;
   final String? motherId;
   final int? motherColorValue;
+  final String? userId; // For cloud sync
 
   Cow({
     required this.id,
@@ -23,7 +24,38 @@ class Cow {
     this.history = const [],
     this.motherId,
     this.motherColorValue,
+    this.userId,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'inseminationDate': inseminationDate.toIso8601String(),
+      'colorValue': colorValue,
+      'isInseminated': isInseminated,
+      'birthDate': birthDate?.toIso8601String(),
+      'bullId': bullId,
+      'history': history,
+      'motherId': motherId,
+      'motherColorValue': motherColorValue,
+      'userId': userId,
+    };
+  }
+
+  factory Cow.fromMap(Map<String, dynamic> map) {
+    return Cow(
+      id: map['id'] ?? '',
+      inseminationDate: DateTime.parse(map['inseminationDate']),
+      colorValue: map['colorValue'] ?? 0,
+      isInseminated: map['isInseminated'] ?? true,
+      birthDate: map['birthDate'] != null ? DateTime.parse(map['birthDate']) : null,
+      bullId: map['bullId'],
+      history: List<dynamic>.from(map['history'] ?? []),
+      motherId: map['motherId'],
+      motherColorValue: map['motherColorValue'],
+      userId: map['userId'],
+    );
+  }
 
   Cow copyWith({
     String? id,
@@ -35,6 +67,7 @@ class Cow {
     List<dynamic>? history,
     String? motherId,
     int? motherColorValue,
+    String? userId,
   }) {
     return Cow(
       id: id ?? this.id,
@@ -46,6 +79,7 @@ class Cow {
       history: history ?? this.history,
       motherId: motherId ?? this.motherId,
       motherColorValue: motherColorValue ?? this.motherColorValue,
+      userId: userId ?? this.userId,
     );
   }
 
@@ -116,13 +150,14 @@ class CowAdapter extends TypeAdapter<Cow> {
       history: fields[6] as List<dynamic>? ?? [],
       motherId: fields[7] as String?,
       motherColorValue: fields[8] as int?,
+      userId: fields[9] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Cow obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -140,6 +175,8 @@ class CowAdapter extends TypeAdapter<Cow> {
       ..writeByte(7)
       ..write(obj.motherId)
       ..writeByte(8)
-      ..write(obj.motherColorValue);
+      ..write(obj.motherColorValue)
+      ..writeByte(9)
+      ..write(obj.userId);
   }
 }

@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "834883426579",
+    "project_id": "sestim-a6d2a",
+    "storage_bucket": "sestim-a6d2a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:834883426579:android:57178e8fbc27c9176f62e6",
+        "android_client_info": {
+          "package_name": "com.sestim"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "834883426579-jk0dbpkpv12junf29h2gq5pfks1dj9vg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sestim",
+            "certificate_hash": "9bf1222e8513fe541a7398663d685588dcf0d8df"
+          }
+        },
+        {
+          "client_id": "834883426579-0lcq66lngt2pj0jn4hb26kno77mmmna0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCcZeccQr2c1YC3jOlIJHYE-dj32_qaAfg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "834883426579-0lcq66lngt2pj0jn4hb26kno77mmmna0.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

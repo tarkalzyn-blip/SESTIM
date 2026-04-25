@@ -16,14 +16,15 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: 1),
-      duration: Duration(milliseconds: 400 + delayMs),
-      curve: Curves.easeOutCubic,
+      duration: Duration(milliseconds: 800 + delayMs),
+      curve: Curves.easeOutExpo,
       builder: (context, value, child) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        return Transform.translate(
-          offset: Offset(0, 20 * (1 - value)),
+        return Transform.scale(
+          scale: value,
           child: Opacity(
             opacity: value.clamp(0.0, 1.0),
             child: Container(
@@ -32,8 +33,15 @@ class StatCard extends StatelessWidget {
                 color: isDark
                     ? color.withValues(alpha: 0.15)
                     : color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: color.withValues(alpha: 0.4)),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  )
+                ],
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -41,15 +49,16 @@ class StatCard extends StatelessWidget {
                   TweenAnimationBuilder<double>(
                     key: ValueKey(count),
                     tween: Tween<double>(begin: 0, end: count.toDouble()),
-                    duration: const Duration(seconds: 1),
-                    curve: Curves.easeOutCubic,
+                    duration: const Duration(seconds: 2),
+                    curve: Curves.easeOutExpo,
                     builder: (context, numberValue, child) {
                       return Text(
                         numberValue.toInt().toString(),
                         style: TextStyle(
-                          fontSize: 28,
+                          fontSize: 32,
                           fontWeight: FontWeight.bold,
                           color: color,
+                          letterSpacing: -1,
                         ),
                       );
                     },
@@ -58,11 +67,13 @@ class StatCard extends StatelessWidget {
                   Text(
                     title,
                     style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
                     ),
                     textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),

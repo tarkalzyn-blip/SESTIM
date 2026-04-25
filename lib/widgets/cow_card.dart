@@ -141,6 +141,11 @@ class _CowCardState extends ConsumerState<CowCard> with SingleTickerProviderStat
                                 'بقرة #${widget.cow.id}',
                                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                               ),
+                              if (widget.cow.userId != null)
+                                const Padding(
+                                  padding: EdgeInsets.only(right: 8.0, left: 8.0),
+                                  child: Icon(Icons.cloud_done, size: 16, color: Colors.green),
+                                ),
                             ],
                           ),
                           AnimatedContainer(

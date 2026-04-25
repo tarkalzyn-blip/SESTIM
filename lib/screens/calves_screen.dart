@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 import 'package:cow_pregnancy/widgets/custom_date_picker.dart';
 
 enum CalfSort { newest, oldest }
+
 enum CalfFilter { active, male, female, exited }
 
 class CalvesScreen extends ConsumerStatefulWidget {
@@ -35,7 +36,7 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
     final now = DateTime.now();
     final difference = now.difference(birthDate);
     final days = difference.inDays;
-    
+
     if (days < 30) return '$days يوم';
     if (days < 365) {
       final months = days ~/ 30;
@@ -57,7 +58,11 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
   /// 1. eventId match (new records)
   /// 2. Exact date string match
   /// 3. DateTime milliseconds match (handles format differences from Hive)
-  bool _matchBirthEvent(dynamic event, String eventId, String originalEventDate) {
+  bool _matchBirthEvent(
+    dynamic event,
+    String eventId,
+    String originalEventDate,
+  ) {
     final title = event['title']?.toString() ?? '';
     if (title != 'تسجيل ولادة' && title != 'تسجيل ولادة سابقة') return false;
     final storedEvId = event['eventId']?.toString();
@@ -74,19 +79,36 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
     return false;
   }
 
-  void _editCalf(BuildContext context, WidgetRef ref, String motherUniqueKey, String eventId, String originalEventDate, String? currentCalfId, int? currentColorValue) {
+  void _editCalf(
+    BuildContext context,
+    WidgetRef ref,
+    String motherUniqueKey,
+    String eventId,
+    String originalEventDate,
+    String? currentCalfId,
+    int? currentColorValue,
+  ) {
     final controller = TextEditingController(text: currentCalfId ?? '');
     int selectedColorValue = currentColorValue ?? Colors.blue.toARGB32();
-    final List<Color> _colors = [
-      Colors.blue, Colors.red, Colors.green, Colors.orange, 
-      Colors.purple, Colors.teal, Colors.pink, Colors.brown
+    final List<Color> colors = [
+      Colors.blue,
+      Colors.red,
+      Colors.green,
+      Colors.orange,
+      Colors.purple,
+      Colors.teal,
+      Colors.pink,
+      Colors.brown,
     ];
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setStateDialog) => AlertDialog(
-          title: const Text('تعديل بيانات المولود', style: TextStyle(fontWeight: FontWeight.bold)),
+          title: const Text(
+            'تعديل بيانات المولود',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -95,21 +117,28 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                 controller: controller,
                 decoration: InputDecoration(
                   labelText: 'رقم المولود',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   prefixIcon: const Icon(Icons.tag),
                 ),
                 autofocus: true,
               ),
               const SizedBox(height: 20),
-              const Text('لون الكرت:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                'لون الكرت:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
-                children: _colors.map((color) {
+                children: colors.map((color) {
                   bool isSelected = selectedColorValue == color.toARGB32();
                   return GestureDetector(
-                    onTap: () => setStateDialog(() => selectedColorValue = color.toARGB32()),
+                    onTap: () => setStateDialog(
+                      () => selectedColorValue = color.toARGB32(),
+                    ),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       width: isSelected ? 40 : 32,
@@ -117,10 +146,18 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                       decoration: BoxDecoration(
                         color: color,
                         shape: BoxShape.circle,
-                        boxShadow: isSelected ? [
-                          BoxShadow(color: color.withValues(alpha: 0.6), blurRadius: 10, spreadRadius: 2)
-                        ] : [],
-                        border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: color.withValues(alpha: 0.6),
+                                  blurRadius: 10,
+                                  spreadRadius: 2,
+                                ),
+                              ]
+                            : [],
+                        border: isSelected
+                            ? Border.all(color: Colors.white, width: 3)
+                            : null,
                       ),
                     ),
                   );
@@ -129,11 +166,16 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء'),
+            ),
             FilledButton(
               onPressed: () {
                 final cows = ref.read(cowProvider);
-                final cowIndex = cows.indexWhere((c) => c.uniqueKey == motherUniqueKey);
+                final cowIndex = cows.indexWhere(
+                  (c) => c.uniqueKey == motherUniqueKey,
+                );
                 if (cowIndex != -1) {
                   final cow = cows[cowIndex];
                   final newHistory = cow.history.map((event) {
@@ -142,16 +184,22 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                       final String newId = controller.text.trim();
                       newEvent['calfId'] = newId.isEmpty ? null : newId;
                       newEvent['calfColorValue'] = selectedColorValue;
-                      
+
                       // Update note if gender info is there
-                      String genderInfo = event['note'].toString().contains('ذكر') ? 'ذكر' : 'أنثى';
-                      newEvent['note'] = 'ولادة - المولود: $genderInfo${newId.isNotEmpty ? ' - رقم: $newId' : ''}';
+                      String genderInfo =
+                          event['note'].toString().contains('ذكر')
+                          ? 'ذكر'
+                          : 'أنثى';
+                      newEvent['note'] =
+                          'ولادة - المولود: $genderInfo${newId.isNotEmpty ? ' - رقم: $newId' : ''}';
                       return newEvent;
                     }
                     return event;
                   }).toList();
-                  
-                  ref.read(cowProvider.notifier).updateCow(cow.copyWith(history: newHistory));
+
+                  ref
+                      .read(cowProvider.notifier)
+                      .updateCow(cow.copyWith(history: newHistory));
                 }
                 Navigator.pop(ctx);
               },
@@ -163,17 +211,32 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
     );
   }
 
-  void _deleteCalf(BuildContext context, WidgetRef ref, String motherUniqueKey, String eventId, String originalEventDate, String? calfId) async {
+  void _deleteCalf(
+    BuildContext context,
+    WidgetRef ref,
+    String motherUniqueKey,
+    String eventId,
+    String originalEventDate,
+    String? calfId,
+  ) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('حذف سجل العجل'),
-        content: Text('هل أنت متأكد من حذف سجل العجل رقم "${calfId ?? 'بدون رقم'}"؟ لا يمكن التراجع عن هذه العملية.'),
+        content: Text(
+          'هل أنت متأكد من حذف سجل العجل رقم "${calfId ?? 'بدون رقم'}"؟ لا يمكن التراجع عن هذه العملية.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('حذف', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            child: const Text(
+              'حذف',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -193,20 +256,32 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
     ref.read(cowProvider.notifier).updateCow(cow.copyWith(history: newHistory));
   }
 
-  void _moveToHerd(BuildContext context, WidgetRef ref, Map<String, dynamic> calf) async {
+  void _moveToHerd(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> calf,
+  ) async {
     DateTime selectedInsemDate = DateTime.now();
-    
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setStateDialog) => AlertDialog(
-          title: const Text('انتقال للقطيع (تلقيح أول)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
+          title: const Text(
+            'انتقال للقطيع (تلقيح أول)',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('سيتم نقل العجولة رقم ${calf['calfId']} إلى قائمة الأبقار بعد تسجيل أول تلقيح لها.'),
+              Text(
+                'سيتم نقل العجولة رقم ${calf['calfId']} إلى قائمة الأبقار بعد تسجيل أول تلقيح لها.',
+              ),
               const SizedBox(height: 20),
-              const Text('تاريخ التلقيح الأول:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                'تاريخ التلقيح الأول:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 12),
               CustomDatePickerField(
                 label: 'تاريخ التلقيح',
@@ -217,7 +292,10 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء'),
+            ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
               style: FilledButton.styleFrom(backgroundColor: Colors.teal),
@@ -231,11 +309,13 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
     if (confirm != true) return;
 
     final cows = ref.read(cowProvider);
-    final motherIndex = cows.indexWhere((c) => c.uniqueKey == calf['motherUniqueKey']);
+    final motherIndex = cows.indexWhere(
+      (c) => c.uniqueKey == calf['motherUniqueKey'],
+    );
     if (motherIndex == -1) return;
 
     final mother = cows[motherIndex];
-    
+
     // 1. Mark calf as exited in mother's history
     final newMotherHistory = mother.history.map((event) {
       if (_matchBirthEvent(event, calf['eventId'], calf['originalEventDate'])) {
@@ -247,8 +327,10 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
       }
       return event;
     }).toList();
-    
-    await ref.read(cowProvider.notifier).updateCow(mother.copyWith(history: newMotherHistory));
+
+    await ref
+        .read(cowProvider.notifier)
+        .updateCow(mother.copyWith(history: newMotherHistory));
 
     // 2. Create new Cow record
     final newCow = Cow(
@@ -264,7 +346,7 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
           'date': selectedInsemDate.toIso8601String(),
           'eventId': const Uuid().v4(),
           'note': 'تم النقل من سجل المواليد بعد بلوغ سن السنة والتلقيح الأول.',
-        }
+        },
       ],
     );
 
@@ -272,7 +354,12 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تم نقل العجولة رقم ${calf['calfId']} إلى قطيع الأبقار بنجاح.'), backgroundColor: Colors.teal),
+        SnackBar(
+          content: Text(
+            'تم نقل العجولة رقم ${calf['calfId']} إلى قطيع الأبقار بنجاح.',
+          ),
+          backgroundColor: Colors.teal,
+        ),
       );
     }
   }
@@ -280,7 +367,7 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
   @override
   Widget build(BuildContext context) {
     final cows = ref.watch(cowProvider);
-    
+
     List<Map<String, dynamic>> calves = [];
     for (var cow in cows) {
       for (var event in cow.history) {
@@ -289,9 +376,15 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
           calves.add({
             'date': DateTime.parse(event['date']),
             'originalEventDate': event['date'],
-            'eventId': event['eventId']?.toString() ?? event['date'].toString(), // unique key for matching
+            'eventId':
+                event['eventId']?.toString() ??
+                event['date'].toString(), // unique key for matching
             'calfId': event['calfId'],
-            'calfColorValue': event['calfColorValue'] ?? (event['note'].toString().contains('ذكر') ? Colors.blue.toARGB32() : Colors.pink.toARGB32()),
+            'calfColorValue':
+                event['calfColorValue'] ??
+                (event['note'].toString().contains('ذكر')
+                    ? Colors.blue.toARGB32()
+                    : Colors.pink.toARGB32()),
             'note': event['note'] ?? '',
             'motherId': cow.id,
             'motherUniqueKey': cow.uniqueKey,
@@ -306,20 +399,28 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
         }
       }
     }
-    
+
     final exactMatch = AppSettings.exactSearchMatch;
     final query = _searchController.text.trim();
 
     final totalCount = calves.where((c) => c['isExited'] != true).length;
-    final maleCount = calves.where((c) => c['isExited'] != true && c['note'].toString().contains('ذكر')).length;
-    final femaleCount = calves.where((c) => c['isExited'] != true && !c['note'].toString().contains('ذكر')).length;
+    final maleCount = calves
+        .where(
+          (c) => c['isExited'] != true && c['note'].toString().contains('ذكر'),
+        )
+        .length;
+    final femaleCount = calves
+        .where(
+          (c) => c['isExited'] != true && !c['note'].toString().contains('ذكر'),
+        )
+        .length;
     final exitedCount = calves.where((c) => c['isExited'] == true).length;
 
     if (query.isNotEmpty) {
       calves = calves.where((calf) {
         final calfId = calf['calfId']?.toString() ?? '';
         final motherId = calf['motherId']?.toString() ?? '';
-        
+
         if (exactMatch) {
           return calfId == query || motherId == query;
         } else {
@@ -329,9 +430,21 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
     }
 
     if (_currentFilter == CalfFilter.male) {
-      calves = calves.where((calf) => calf['isExited'] != true && calf['note'].toString().contains('ذكر')).toList();
+      calves = calves
+          .where(
+            (calf) =>
+                calf['isExited'] != true &&
+                calf['note'].toString().contains('ذكر'),
+          )
+          .toList();
     } else if (_currentFilter == CalfFilter.female) {
-      calves = calves.where((calf) => calf['isExited'] != true && !calf['note'].toString().contains('ذكر')).toList();
+      calves = calves
+          .where(
+            (calf) =>
+                calf['isExited'] != true &&
+                !calf['note'].toString().contains('ذكر'),
+          )
+          .toList();
     } else if (_currentFilter == CalfFilter.exited) {
       calves = calves.where((calf) => calf['isExited'] == true).toList();
     } else {
@@ -359,13 +472,19 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                   setState(() {});
                 },
               )
-            : const Text('سجل المواليد (العجول)', style: TextStyle(fontWeight: FontWeight.bold)),
+            : const Text(
+                'سجل المواليد (العجول)',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
         centerTitle: !_isSearching,
         actions: [
           if (!_isSearching)
             IconButton(
               icon: const Icon(Icons.settings),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              ),
             ),
           if (_isSearching)
             IconButton(
@@ -390,8 +509,14 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                 });
               },
               itemBuilder: (context) => const [
-                PopupMenuItem(value: CalfSort.newest, child: Text('الأحدث أولاً')),
-                PopupMenuItem(value: CalfSort.oldest, child: Text('الأقدم أولاً')),
+                PopupMenuItem(
+                  value: CalfSort.newest,
+                  child: Text('الأحدث أولاً'),
+                ),
+                PopupMenuItem(
+                  value: CalfSort.oldest,
+                  child: Text('الأقدم أولاً'),
+                ),
               ],
             ),
             IconButton(
@@ -402,13 +527,16 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                 });
               },
             ),
-          ]
+          ],
         ],
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
@@ -418,9 +546,15 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                   const SizedBox(width: 8),
                   _buildFilterChip('عجول ذكور ($maleCount)', CalfFilter.male),
                   const SizedBox(width: 8),
-                  _buildFilterChip('عجلات إناث ($femaleCount)', CalfFilter.female),
+                  _buildFilterChip(
+                    'عجلات إناث ($femaleCount)',
+                    CalfFilter.female,
+                  ),
                   const SizedBox(width: 8),
-                  _buildFilterChip('المستبعدة ($exitedCount)', CalfFilter.exited),
+                  _buildFilterChip(
+                    'المستبعدة ($exitedCount)',
+                    CalfFilter.exited,
+                  ),
                 ],
               ),
             ),
@@ -429,7 +563,9 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
             child: calves.isEmpty
                 ? Center(
                     child: Text(
-                      _isSearching ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد سجلات مواليد حالياً',
+                      _isSearching
+                          ? 'لا توجد نتائج مطابقة للبحث'
+                          : 'لا توجد سجلات مواليد حالياً',
                       style: const TextStyle(fontSize: 18, color: Colors.grey),
                     ),
                   )
@@ -441,104 +577,198 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                       final isMale = calf['note'].toString().contains('ذكر');
                       final calfId = calf['calfId'];
                       final calfColor = Color(calf['calfColorValue']);
-                      
+
                       return Column(
                         children: [
                           Card(
                             margin: const EdgeInsets.only(bottom: 12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(15),
-                              side: BorderSide(color: calfColor.withValues(alpha: 0.3), width: 1),
+                              side: BorderSide(
+                                color: calfColor.withValues(alpha: 0.3),
+                                width: 1,
+                              ),
                             ),
                             elevation: calf['isExited'] == true ? 0 : 2,
-                            color: calf['isExited'] == true ? Colors.grey.withValues(alpha: 0.1) : null,
+                            color: calf['isExited'] == true
+                                ? Colors.grey.withValues(alpha: 0.1)
+                                : null,
                             child: InkWell(
                               onTap: () async {
                                 await Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => CalfDetailScreen(calfData: calf),
+                                    builder: (context) =>
+                                        CalfDetailScreen(calfData: calf),
                                   ),
                                 );
                                 // Refresh UI if state changed
                                 setState(() {});
                               },
-                              onLongPress: () => _editCalf(context, ref, calf['motherUniqueKey'], calf['eventId'], calf['originalEventDate'], calfId, calf['calfColorValue']),
+                              onLongPress: () => _editCalf(
+                                context,
+                                ref,
+                                calf['motherUniqueKey'],
+                                calf['eventId'],
+                                calf['originalEventDate'],
+                                calfId,
+                                calf['calfColorValue'],
+                              ),
                               borderRadius: BorderRadius.circular(15),
                               child: Stack(
                                 children: [
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 16,
+                                    ),
                                     child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
                                       children: [
                                         Container(
                                           padding: const EdgeInsets.all(10),
                                           decoration: BoxDecoration(
-                                            color: calf['isExited'] == true ? Colors.grey.withValues(alpha: 0.2) : calfColor.withValues(alpha: 0.15),
+                                            color: calf['isExited'] == true
+                                                ? Colors.grey.withValues(
+                                                    alpha: 0.2,
+                                                  )
+                                                : calfColor.withValues(
+                                                    alpha: 0.15,
+                                                  ),
                                             shape: BoxShape.circle,
-                                            border: Border.all(color: calf['isExited'] == true ? Colors.grey : calfColor, width: 2),
+                                            border: Border.all(
+                                              color: calf['isExited'] == true
+                                                  ? Colors.grey
+                                                  : calfColor,
+                                              width: 2,
+                                            ),
                                           ),
                                           child: Text(
                                             calfId?.toString() ?? '?',
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 18,
-                                              color: calf['isExited'] == true ? Colors.grey : calfColor,
+                                              color: calf['isExited'] == true
+                                                  ? Colors.grey
+                                                  : calfColor,
                                             ),
                                           ),
                                         ),
                                         const SizedBox(width: 12),
                                         Expanded(
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Row(
                                                 children: [
                                                   Text(
                                                     'مولود #${calfId ?? "بدون"}',
                                                     style: TextStyle(
-                                                      fontWeight: FontWeight.bold,
+                                                      fontWeight:
+                                                          FontWeight.bold,
                                                       fontSize: 16,
-                                                      decoration: calf['isExited'] == true ? TextDecoration.lineThrough : null,
-                                                      color: calf['isExited'] == true ? Colors.grey : null,
+                                                      decoration:
+                                                          calf['isExited'] ==
+                                                              true
+                                                          ? TextDecoration
+                                                                .lineThrough
+                                                          : null,
+                                                      color:
+                                                          calf['isExited'] ==
+                                                              true
+                                                          ? Colors.grey
+                                                          : null,
                                                     ),
                                                   ),
-                                                  if (calf['isExited'] == true) ...[
+                                                  if (calf['isExited'] ==
+                                                      true) ...[
                                                     const SizedBox(width: 8),
                                                     Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                      decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(4)),
-                                                      child: Text(calf['exitReason'] ?? 'مستبعد', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                                    )
-                                                  ]
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 6,
+                                                            vertical: 2,
+                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.redAccent,
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              4,
+                                                            ),
+                                                      ),
+                                                      child: Text(
+                                                        calf['exitReason'] ??
+                                                            'مستبعد',
+                                                        style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 10,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ],
                                               ),
                                               const SizedBox(height: 8),
                                               Row(
                                                 children: [
-                                                  const Icon(Icons.timer_outlined, size: 14, color: Colors.grey),
+                                                  const Icon(
+                                                    Icons.timer_outlined,
+                                                    size: 14,
+                                                    color: Colors.grey,
+                                                  ),
                                                   const SizedBox(width: 4),
-                                                  Text('العمر: ${_calculateAge(calf['date'])}', style: const TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold)),
+                                                  Text(
+                                                    'العمر: ${_calculateAge(calf['date'])}',
+                                                    style: const TextStyle(
+                                                      color: Colors.blueGrey,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
                                                 ],
                                               ),
                                               const SizedBox(height: 4),
                                               Row(
                                                 children: [
-                                                  const Icon(Icons.female, size: 14, color: Colors.grey),
+                                                  const Icon(
+                                                    Icons.female,
+                                                    size: 14,
+                                                    color: Colors.grey,
+                                                  ),
                                                   const SizedBox(width: 4),
-                                                  const Text('الأم: ', style: TextStyle(fontSize: 12)),
+                                                  const Text(
+                                                    'الأم: ',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
                                                   Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 6,
+                                                          vertical: 2,
+                                                        ),
                                                     decoration: BoxDecoration(
-                                                      color: calf['motherColor'].withValues(alpha: 0.2),
-                                                      borderRadius: BorderRadius.circular(4),
+                                                      color: calf['motherColor']
+                                                          .withValues(
+                                                            alpha: 0.2,
+                                                          ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            4,
+                                                          ),
                                                     ),
                                                     child: Text(
                                                       '#${calf['motherId']}',
                                                       style: TextStyle(
-                                                        fontWeight: FontWeight.bold,
-                                                        color: calf['motherColor'],
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color:
+                                                            calf['motherColor'],
                                                         fontSize: 12,
                                                       ),
                                                     ),
@@ -549,21 +779,52 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                                           ),
                                         ),
                                         IconButton(
-                                          icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.blueGrey),
+                                          icon: const Icon(
+                                            Icons.edit_outlined,
+                                            size: 20,
+                                            color: Colors.blueGrey,
+                                          ),
                                           tooltip: 'تعديل',
-                                          onPressed: () => _editCalf(context, ref, calf['motherUniqueKey'], calf['eventId'], calf['originalEventDate'], calfId, calf['calfColorValue']),
+                                          onPressed: () => _editCalf(
+                                            context,
+                                            ref,
+                                            calf['motherUniqueKey'],
+                                            calf['eventId'],
+                                            calf['originalEventDate'],
+                                            calfId,
+                                            calf['calfColorValue'],
+                                          ),
                                         ),
                                         // Insemination Move Button for Heifers >= 1 Year
-                                        if (!isMale && calf['isExited'] != true && _calculateAgeInDays(calf['date']) >= 365)
+                                        if (!isMale &&
+                                            calf['isExited'] != true &&
+                                            _calculateAgeInDays(calf['date']) >=
+                                                365)
                                           IconButton(
-                                            icon: const Icon(Icons.upgrade, size: 22, color: Colors.teal),
+                                            icon: const Icon(
+                                              Icons.upgrade,
+                                              size: 22,
+                                              color: Colors.teal,
+                                            ),
                                             tooltip: 'تلقيح ونقل للقطيع',
-                                            onPressed: () => _moveToHerd(context, ref, calf),
+                                            onPressed: () =>
+                                                _moveToHerd(context, ref, calf),
                                           ),
                                         IconButton(
-                                          icon: const Icon(Icons.delete_outline, size: 20, color: Colors.redAccent),
+                                          icon: const Icon(
+                                            Icons.delete_outline,
+                                            size: 20,
+                                            color: Colors.redAccent,
+                                          ),
                                           tooltip: 'حذف',
-                                          onPressed: () => _deleteCalf(context, ref, calf['motherUniqueKey'], calf['eventId'], calf['originalEventDate'], calfId),
+                                          onPressed: () => _deleteCalf(
+                                            context,
+                                            ref,
+                                            calf['motherUniqueKey'],
+                                            calf['eventId'],
+                                            calf['originalEventDate'],
+                                            calfId,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -572,16 +833,28 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                                     top: 0,
                                     end: 0,
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: calf['isExited'] == true ? Colors.grey : (isMale ? Colors.blue.shade300 : Colors.pink.shade300),
-                                        borderRadius: const BorderRadiusDirectional.only(
-                                          bottomStart: Radius.circular(15),
-                                        ),
+                                        color: calf['isExited'] == true
+                                            ? Colors.grey
+                                            : (isMale
+                                                  ? Colors.blue.shade300
+                                                  : Colors.pink.shade300),
+                                        borderRadius:
+                                            const BorderRadiusDirectional.only(
+                                              bottomStart: Radius.circular(15),
+                                            ),
                                       ),
                                       child: Text(
                                         isMale ? 'ذكر' : 'أنثى',
-                                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -589,11 +862,12 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                               ),
                             ),
                           ),
-                    if (index == calves.length - 1) const SizedBox(height: 100),
-                  ],
-                );
-              },
-            ),
+                          if (index == calves.length - 1)
+                            const SizedBox(height: 100),
+                        ],
+                      );
+                    },
+                  ),
           ),
         ],
       ),

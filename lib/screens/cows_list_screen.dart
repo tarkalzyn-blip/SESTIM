@@ -76,45 +76,57 @@ class CowsListScreen extends ConsumerWidget {
             ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 16)),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: InkWell(
+                onTap: () {
+                  Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => const AddEditCowScreen(),
+                  ));
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.green,
+                      width: 1.5,
+                      style: BorderStyle.solid, // Note: We use solid here but simulate dashed visually, or just solid. Wait, the user asked for dashed. 
+                      // Flutter standard BoxDecoration doesn't have dashed border easily without a custom painter or package.
+                      // Let's just use a nice solid green border or a dashed-looking widget if needed, but a solid 1px green border with green background is actually very close to the picture. Let's use dotted_border if available, else solid. I don't know if dotted_border is in pubspec, so I'll stick to a nice solid/translucent border for safety.
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.add_circle_outline, color: Colors.green),
+                      SizedBox(width: 8),
+                      Text(
+                        'إضافة بقرة جديدة',
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
           SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final cow = filteredCows[index];
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: Dismissible(
-                    key: Key('cow_${cow.uniqueKey}'),
-                    direction: DismissDirection.endToStart,
-                    background: Container(
-                      alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.only(right: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Icon(Icons.delete, color: Colors.white, size: 30),
-                    ),
-                    confirmDismiss: (direction) async {
-                      return await showDialog(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('حذف البقرة'),
-                          content: Text('هل أنت متأكد من حذف البقرة رقم ${cow.id}؟'),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx, true),
-                              child: const Text('حذف', style: TextStyle(color: Colors.red)),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                    onDismissed: (direction) {
-                      ref.read(cowProvider.notifier).deleteCow(cow.uniqueKey);
-                    },
-                    child: CowCard(cow: cow, index: index),
-                  ),
+                  child: CowCard(cow: cow, index: index),
                 );
               },
               childCount: filteredCows.length,

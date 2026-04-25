@@ -17,19 +17,25 @@ class AddEditCowScreen extends ConsumerStatefulWidget {
 
 class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
   final _formKey = GlobalKey<FormState>();
-  
+
   late TextEditingController _idController;
   late TextEditingController _bullIdController;
   late TextEditingController _motherIdController;
-  
+
   CowFormState _currentState = CowFormState.pregnant;
   DateTime _selectedDate = DateTime.now();
   int _selectedColorValue = Colors.blue.toARGB32();
   int? _selectedMotherColorValue;
 
   final List<Color> _colors = [
-    Colors.blue, Colors.red, Colors.green, Colors.orange, 
-    Colors.purple, Colors.teal, Colors.pink, Colors.brown
+    Colors.blue,
+    Colors.red,
+    Colors.green,
+    Colors.orange,
+    Colors.purple,
+    Colors.teal,
+    Colors.pink,
+    Colors.brown,
   ];
 
   @override
@@ -37,7 +43,9 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
     super.initState();
     _idController = TextEditingController(text: widget.cow?.id ?? '');
     _bullIdController = TextEditingController(text: widget.cow?.bullId ?? '');
-    _motherIdController = TextEditingController(text: widget.cow?.motherId ?? '');
+    _motherIdController = TextEditingController(
+      text: widget.cow?.motherId ?? '',
+    );
     _selectedMotherColorValue = widget.cow?.motherColorValue;
 
     if (widget.cow != null) {
@@ -78,7 +86,9 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
       }
 
       List<dynamic> history = widget.cow?.history.toList() ?? [];
-      if (widget.cow == null || widget.cow!.inseminationDate != inseminationDate || widget.cow!.birthDate != birthDate) {
+      if (widget.cow == null ||
+          widget.cow!.inseminationDate != inseminationDate ||
+          widget.cow!.birthDate != birthDate) {
         String title = '';
         if (_currentState == CowFormState.pregnant) title = 'تسجيل تلقيح';
         if (_currentState == CowFormState.heat) title = 'تسجيل شبق';
@@ -87,7 +97,11 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
         history.add({
           'title': title,
           'date': _selectedDate.toIso8601String(),
-          'note': _currentState == CowFormState.pregnant && _bullIdController.text.isNotEmpty ? 'طلوقة/عجل: ${_bullIdController.text}' : '',
+          'note':
+              _currentState == CowFormState.pregnant &&
+                  _bullIdController.text.isNotEmpty
+              ? 'طلوقة/عجل: ${_bullIdController.text}'
+              : '',
         });
       }
 
@@ -98,20 +112,25 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
         isInseminated: isInseminated,
         birthDate: birthDate,
         bullId: _bullIdController.text.isEmpty ? null : _bullIdController.text,
-        motherId: _motherIdController.text.isEmpty ? null : _motherIdController.text,
+        motherId: _motherIdController.text.isEmpty
+            ? null
+            : _motherIdController.text,
         motherColorValue: _selectedMotherColorValue,
         history: history,
       );
 
       final cows = ref.read(cowProvider);
-      
+
       if (widget.cow == null) {
         // Checking for duplicate uniqueKey (ID + Color)
         final alreadyExists = cows.any((c) => c.uniqueKey == cow.uniqueKey);
         if (alreadyExists) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('هذا الرقم موجود مسبقاً بنفس لون الكرت!', style: TextStyle(fontWeight: FontWeight.bold)),
+              content: Text(
+                'هذا الرقم موجود مسبقاً بنفس لون الكرت!',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -125,21 +144,31 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
           if (alreadyExists) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('الرقم واللون الجديد موجودين مسبقاً لبقرة أخرى!', style: TextStyle(fontWeight: FontWeight.bold)),
+                content: Text(
+                  'الرقم واللون الجديد موجودين مسبقاً لبقرة أخرى!',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 backgroundColor: Colors.red,
               ),
             );
             return;
           }
         }
-        ref.read(cowProvider.notifier).updateCow(cow, oldKey: widget.cow!.uniqueKey);
+        ref
+            .read(cowProvider.notifier)
+            .updateCow(cow, oldKey: widget.cow!.uniqueKey);
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('تم الحفظ بنجاح', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: const Text(
+            'تم الحفظ بنجاح',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
           backgroundColor: Colors.green,
           margin: const EdgeInsets.all(16),
         ),
@@ -168,9 +197,12 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
 
   String _getDateLabel() {
     switch (_currentState) {
-      case CowFormState.pregnant: return 'تاريخ التلقيح';
-      case CowFormState.heat: return 'تاريخ آخر شبق';
-      case CowFormState.postBirth: return 'تاريخ الولادة';
+      case CowFormState.pregnant:
+        return 'تاريخ التلقيح';
+      case CowFormState.heat:
+        return 'تاريخ آخر شبق';
+      case CowFormState.postBirth:
+        return 'تاريخ الولادة';
     }
   }
 
@@ -192,26 +224,40 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
                   controller: _idController,
                   decoration: InputDecoration(
                     labelText: 'رقم/اسم البقرة',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     prefixIcon: const Icon(Icons.tag),
                   ),
-                  validator: (val) => val == null || val.isEmpty ? 'مطلوب' : null,
+                  validator: (val) =>
+                      val == null || val.isEmpty ? 'مطلوب' : null,
                 ),
                 0,
               ),
               const SizedBox(height: 20),
               _buildAnimatedItem(
                 DropdownButtonFormField<CowFormState>(
-                  value: _currentState,
+                  initialValue: _currentState,
                   decoration: InputDecoration(
                     labelText: 'حالة البقرة الحالية',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     prefixIcon: const Icon(Icons.info_outline),
                   ),
                   items: const [
-                    DropdownMenuItem(value: CowFormState.pregnant, child: Text('حامل (تم التلقيح)')),
-                    DropdownMenuItem(value: CowFormState.heat, child: Text('انتظار الشبق (غير ملقحة)')),
-                    DropdownMenuItem(value: CowFormState.postBirth, child: Text('حديثة الولادة (التعافي)')),
+                    DropdownMenuItem(
+                      value: CowFormState.pregnant,
+                      child: Text('حامل (تم التلقيح)'),
+                    ),
+                    DropdownMenuItem(
+                      value: CowFormState.heat,
+                      child: Text('انتظار الشبق (غير ملقحة)'),
+                    ),
+                    DropdownMenuItem(
+                      value: CowFormState.postBirth,
+                      child: Text('حديثة الولادة (التعافي)'),
+                    ),
                   ],
                   onChanged: (val) => setState(() => _currentState = val!),
                 ),
@@ -222,7 +268,8 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
                 CustomDatePickerField(
                   label: _getDateLabel(),
                   initialDate: _selectedDate,
-                  onDateSelected: (date) => setState(() => _selectedDate = date),
+                  onDateSelected: (date) =>
+                      setState(() => _selectedDate = date),
                 ),
                 100,
               ),
@@ -233,7 +280,9 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
                     controller: _bullIdController,
                     decoration: InputDecoration(
                       labelText: 'رقم/اسم الطلوقة (اختياري)',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       prefixIcon: const Icon(Icons.pets),
                     ),
                   ),
@@ -244,7 +293,14 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
               const Divider(),
               const SizedBox(height: 20),
               _buildAnimatedItem(
-                const Text('معلومات الأنساب (اختياري)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.blueGrey)),
+                const Text(
+                  'معلومات الأنساب (اختياري)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Colors.blueGrey,
+                  ),
+                ),
                 170,
               ),
               const SizedBox(height: 16),
@@ -253,16 +309,22 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
                   controller: _motherIdController,
                   decoration: InputDecoration(
                     labelText: 'رقم الأم (إذا كانت في المزرعة)',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     prefixIcon: const Icon(Icons.family_restroom),
                   ),
                 ),
                 180,
               ),
               const SizedBox(height: 16),
-              if (_motherIdController.text.isNotEmpty || _selectedMotherColorValue != null) ...[
+              if (_motherIdController.text.isNotEmpty ||
+                  _selectedMotherColorValue != null) ...[
                 _buildAnimatedItem(
-                  const Text('لون كرت الأم:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const Text(
+                    'لون كرت الأم:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
                   190,
                 ),
                 const SizedBox(height: 8),
@@ -271,16 +333,21 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
                     spacing: 12,
                     runSpacing: 12,
                     children: _colors.map((color) {
-                      bool isSelected = _selectedMotherColorValue == color.toARGB32();
+                      bool isSelected =
+                          _selectedMotherColorValue == color.toARGB32();
                       return GestureDetector(
-                        onTap: () => setState(() => _selectedMotherColorValue = color.toARGB32()),
+                        onTap: () => setState(
+                          () => _selectedMotherColorValue = color.toARGB32(),
+                        ),
                         child: Container(
                           width: 35,
                           height: 35,
                           decoration: BoxDecoration(
                             color: color.withValues(alpha: 0.5),
                             shape: BoxShape.circle,
-                            border: isSelected ? Border.all(color: Colors.black, width: 2) : null,
+                            border: isSelected
+                                ? Border.all(color: Colors.black, width: 2)
+                                : null,
                           ),
                         ),
                       );
@@ -293,7 +360,10 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
               const Divider(),
               const SizedBox(height: 20),
               _buildAnimatedItem(
-                const Text('اللون المميز للبقرة:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const Text(
+                  'اللون المميز للبقرة:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
                 250,
               ),
               const SizedBox(height: 12),
@@ -304,7 +374,9 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
                   children: _colors.map((color) {
                     bool isSelected = _selectedColorValue == color.toARGB32();
                     return GestureDetector(
-                      onTap: () => setState(() => _selectedColorValue = color.toARGB32()),
+                      onTap: () => setState(
+                        () => _selectedColorValue = color.toARGB32(),
+                      ),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         width: isSelected ? 48 : 40,
@@ -312,10 +384,18 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
                         decoration: BoxDecoration(
                           color: color,
                           shape: BoxShape.circle,
-                          boxShadow: isSelected ? [
-                            BoxShadow(color: color.withValues(alpha: 0.6), blurRadius: 10, spreadRadius: 2)
-                          ] : [],
-                          border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: color.withValues(alpha: 0.6),
+                                    blurRadius: 10,
+                                    spreadRadius: 2,
+                                  ),
+                                ]
+                              : [],
+                          border: isSelected
+                              ? Border.all(color: Colors.white, width: 3)
+                              : null,
                         ),
                       ),
                     );
@@ -335,11 +415,17 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
                       ),
                     ),
                     onPressed: _save,
-                    child: const Text('حفظ البيانات', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'حفظ البيانات',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
                 400,
-              )
+              ),
             ],
           ),
         ),

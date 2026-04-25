@@ -1,4 +1,4 @@
-package com.example.cow_pregnancy
+package com.sestim
 
 import io.flutter.embedding.android.FlutterActivity
 

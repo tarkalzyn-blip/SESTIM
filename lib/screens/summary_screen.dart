@@ -7,6 +7,7 @@ import 'package:cow_pregnancy/models/cow_model.dart';
 import 'package:cow_pregnancy/screens/settings_screen.dart';
 import 'package:cow_pregnancy/screens/cow_detail_screen.dart';
 import 'package:cow_pregnancy/services/notification_service.dart';
+import 'package:cow_pregnancy/providers/theme_provider.dart';
 
 class SummaryScreen extends ConsumerWidget {
   const SummaryScreen({super.key});
@@ -15,10 +16,16 @@ class SummaryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cows = ref.watch(cowProvider);
     final smartAlerts = ref.watch(alertsProvider);
+    final syncStatus = ref.watch(syncStatusProvider);
 
-    // Schedule daily morning notification whenever alerts change
-    final urgentCount = smartAlerts.where((a) => a.severity == AlertSeverity.high).length;
-    NotificationService().scheduleDailyMorningSummary(urgentCount, smartAlerts.length);
+    // جدولة الإشعارات فقط عند حدوث تغيير حقيقي في التنبيهات وليس في كل إعادة بناء للشاشة
+    ref.listen(alertsProvider, (previous, next) {
+      if (next.isNotEmpty) {
+        final urgentCount = next.where((a) => a.severity == AlertSeverity.high).length;
+        NotificationService().scheduleDailyMorningSummary(urgentCount, next.length);
+      }
+    });
+
     final int totalCows = cows.length;
     final int pregnantCount = cows.where((c) => c.isInseminated && !c.isPostBirth && c.daysSinceInsemination > 25).length;
     final int postBirthCount = cows.where((c) => c.isPostBirth).length;
@@ -62,6 +69,27 @@ class SummaryScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (syncStatus != null)
+              Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.sync_problem, color: Colors.red),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(syncStatus, style: const TextStyle(color: Colors.red, fontSize: 12))),
+                    IconButton(
+                      icon: const Icon(Icons.refresh, color: Colors.red),
+                      onPressed: () => ref.read(cowProvider.notifier).syncLocalToCloud(),
+                    )
+                  ],
+                ),
+              ),
             const Text(
               'نظرة عامة',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blueGrey),
@@ -191,6 +219,9 @@ class SummaryScreen extends ConsumerWidget {
 
     if (alert.severity == AlertSeverity.high) cardColor = Colors.redAccent;
 
+    // لون البقرة الخاص بها
+    final cowColor = Color(alert.cowColorValue);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -203,14 +234,12 @@ class SummaryScreen extends ConsumerWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
           onTap: () {
-            // Find cow and navigate
             try {
               final cow = cows.firstWhere((c) => c.uniqueKey == alert.relatedCowKey);
               Navigator.push(context, MaterialPageRoute(
                 builder: (_) => CowDetailScreen(cow: cow),
               ));
             } catch (e) {
-              // Cow not found, maybe deleted
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('البقرة غير موجودة!')),
               );
@@ -245,12 +274,45 @@ class SummaryScreen extends ConsumerWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (alert.severity == AlertSeverity.high)
+                          const SizedBox(width: 8),
+                          // Badge رقم البقرة بلون كرتها
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: cowColor,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: cowColor.withValues(alpha: 0.4),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.circle, size: 8, color: Colors.white),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '#${alert.cowId}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (alert.severity == AlertSeverity.high) ...[
+                            const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)),
                               child: const Text('عاجل', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                            )
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 6),
