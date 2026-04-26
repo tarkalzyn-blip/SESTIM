@@ -87,10 +87,13 @@ class SummaryScreen extends ConsumerWidget {
         prodMilking++;
       }
 
-      // --- العجول ---
+      // --- العجول (الموجودة حالياً فقط) ---
       for (var event in cow.history) {
         final title = event['title']?.toString() ?? '';
         if (title == 'تسجيل ولادة' || title == 'تسجيل ولادة سابقة') {
+          // نتجاهل العجول التي تم استبعادها (بيع، نفوق، أو انتقال للقطيع)
+          if (event['isExited'] == true) continue;
+
           totalCalves++;
           String note = event['note'] ?? '';
           if (note.contains('ذكر')) {
@@ -155,6 +158,18 @@ class SummaryScreen extends ConsumerWidget {
                    const Text('إجمالي القطيع', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue)),
                    const SizedBox(height: 5),
                    Text('$totalCows بقرة', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.blue)),
+                   
+                   const Padding(
+                     padding: EdgeInsets.symmetric(vertical: 12),
+                     child: Divider(height: 1, thickness: 1, color: Color(0x332196F3)),
+                   ),
+                   Row(
+                     mainAxisAlignment: MainAxisAlignment.spaceAround,
+                     children: [
+                       _buildMiniStat('عجول ذكور', maleCalves, Colors.blue),
+                       _buildMiniStat('عجلات إناث', femaleCalves, Colors.pink),
+                     ],
+                   ),
                  ]
               )
             ),
@@ -273,7 +288,7 @@ class SummaryScreen extends ConsumerWidget {
         icon = Icons.child_friendly;
         break;
       case AlertType.heat:
-        cardColor = Colors.pink;
+        cardColor = Colors.amber;
         icon = Icons.favorite_border;
         break;
       case AlertType.lateInsemination:
@@ -294,22 +309,19 @@ class SummaryScreen extends ConsumerWidget {
         break;
     }
 
-    if (alert.severity == AlertSeverity.high) cardColor = Colors.redAccent;
+
 
     // لون البقرة الخاص بها
     final cowColor = Color(alert.cowColorValue);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: cardColor.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: cardColor.withValues(alpha: 0.3)),
-      ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
+          splashColor: cardColor.withValues(alpha: 0.25),
+          highlightColor: cardColor.withValues(alpha: 0.15),
           onTap: () {
             try {
               final cow = cows.firstWhere((c) => c.uniqueKey == alert.relatedCowKey);
@@ -322,8 +334,14 @@ class SummaryScreen extends ConsumerWidget {
               );
             }
           },
-          child: Padding(
-            padding: const EdgeInsets.all(16),
+          child: Ink(
+            decoration: BoxDecoration(
+              color: cardColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: cardColor.withValues(alpha: 0.3)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -382,8 +400,9 @@ class SummaryScreen extends ConsumerWidget {
             ),
           ),
         ),
-      ),
-    );
+        ),           // InkWell
+      ),             // Material
+    );               // Container
   }
 
   Widget _buildCalfStatRow(String title, int count, IconData icon, Color color) {
@@ -410,6 +429,29 @@ class SummaryScreen extends ConsumerWidget {
         Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
         const SizedBox(height: 4),
         Text('$count', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  Widget _buildMiniStat(String label, int count, Color color) {
+    return Column(
+      children: [
+        Text(
+          '$count',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: color.withValues(alpha: 0.8),
+          ),
+        ),
       ],
     );
   }

@@ -213,8 +213,8 @@ class _DatePickerDialogState extends State<_DatePickerDialog> {
         ? Colors.white.withValues(alpha: 0.1)
         : Colors.black.withValues(alpha: 0.07);
 
-    const double itemH = 60.0;
-    const double pickerH = itemH * 3.0; // Exactly 3 items visible
+    const double itemH = 65.0;
+    const double pickerH = itemH * 5.0; // 5 items visible for a wider, smoother look
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -253,11 +253,12 @@ class _DatePickerDialogState extends State<_DatePickerDialog> {
             const SizedBox(height: 12),
 
             // ── Picker body ────────────────────────────────────
-            SizedBox(
-              height: pickerH,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
+            ClipRect(
+              child: SizedBox(
+                height: pickerH,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
                   // Selection highlight band
                   Positioned(
                     child: Container(
@@ -282,7 +283,7 @@ class _DatePickerDialogState extends State<_DatePickerDialog> {
                           Colors.black,
                           Colors.transparent,
                         ],
-                        stops: [0.0, 0.15, 0.85, 1.0],
+                        stops: [0.0, 0.35, 0.65, 1.0], // Fades top 35% and bottom 35% smoothly
                       ).createShader(bounds);
                     },
                     blendMode: BlendMode.dstIn,
@@ -304,18 +305,22 @@ class _DatePickerDialogState extends State<_DatePickerDialog> {
                               final isSelected = day == _selectedDay;
                               final isInvalid = day > maxD;
                               return Center(
-                                child: Text(
-                                  day.toString().padLeft(2, '0'),
-                                  style: TextStyle(
-                                    fontSize: isSelected ? 24.5 : 22,
-                                    fontWeight: isSelected
-                                        ? FontWeight.w600
-                                        : FontWeight.w400,
-                                    color: isInvalid
-                                        ? Colors.transparent
-                                        : isSelected
-                                            ? selectedColor
-                                            : unselectedColor,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    day.toString().padLeft(2, '0'),
+                                    style: TextStyle(
+                                      fontSize: isSelected ? 24.5 : 22,
+                                      height: 1.0, // Force strict vertical bounds to prevent clipping
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
+                                      color: isInvalid
+                                          ? Colors.transparent
+                                          : isSelected
+                                              ? selectedColor
+                                              : unselectedColor,
+                                    ),
                                   ),
                                 ),
                               );
@@ -334,16 +339,20 @@ class _DatePickerDialogState extends State<_DatePickerDialog> {
                               final month = (i % 12) + 1;
                               final isSelected = month == _selectedMonth;
                               return Center(
-                                child: Text(
-                                  month.toString().padLeft(2, '0'),
-                                  style: TextStyle(
-                                    fontSize: isSelected ? 24.5 : 22,
-                                    fontWeight: isSelected
-                                        ? FontWeight.w600
-                                        : FontWeight.w400,
-                                    color: isSelected
-                                        ? selectedColor
-                                        : unselectedColor,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    month.toString().padLeft(2, '0'),
+                                    style: TextStyle(
+                                      fontSize: isSelected ? 24.5 : 22,
+                                      height: 1.0, // Force strict vertical bounds to prevent clipping
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
+                                      color: isSelected
+                                          ? selectedColor
+                                          : unselectedColor,
+                                    ),
                                   ),
                                 ),
                               );
@@ -363,16 +372,20 @@ class _DatePickerDialogState extends State<_DatePickerDialog> {
                               final year = _yearStart + i;
                               final isSelected = year == _selectedYear;
                               return Center(
-                                child: Text(
-                                  year.toString(),
-                                  style: TextStyle(
-                                    fontSize: isSelected ? 24.5 : 22,
-                                    fontWeight: isSelected
-                                        ? FontWeight.w600
-                                        : FontWeight.w400,
-                                    color: isSelected
-                                        ? selectedColor
-                                        : unselectedColor,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    year.toString(),
+                                    style: TextStyle(
+                                      fontSize: isSelected ? 24.5 : 22,
+                                      height: 1.0, // Force strict vertical bounds to prevent clipping
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
+                                      color: isSelected
+                                          ? selectedColor
+                                          : unselectedColor,
+                                    ),
                                   ),
                                 ),
                               );
@@ -386,6 +399,7 @@ class _DatePickerDialogState extends State<_DatePickerDialog> {
               ],
             ),
           ),
+          ), // Closing ClipRect
 
             const SizedBox(height: 8),
 
@@ -479,7 +493,7 @@ class _DatePickerDialogState extends State<_DatePickerDialog> {
       useMagnifier: false,
       magnification: 1.0,
       onSelectedItemChanged: onChanged,
-      clipBehavior: Clip.hardEdge,
+      clipBehavior: Clip.none, // Prevent text clipping on squeezed items
       childDelegate: count != null 
           ? ListWheelChildBuilderDelegate(builder: itemBuilder, childCount: count)
           : ListWheelChildBuilderDelegate(builder: itemBuilder),

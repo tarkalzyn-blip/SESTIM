@@ -52,7 +52,7 @@ final alertsProvider = Provider<List<SmartAlert>>((ref) {
             title: 'مراقبة الشبق',
             description:
                 'مر عليها $daysSinceInsemination يوم من التلقيح، يرجى مراقبتها.',
-            severity: AlertSeverity.high,
+            severity: AlertSeverity.medium,
             type: AlertType.heat,
             relatedCowKey: cow.uniqueKey,
             cowId: cow.id,

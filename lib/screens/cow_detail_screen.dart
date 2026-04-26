@@ -8,6 +8,7 @@ import 'package:cow_pregnancy/providers/cow_provider.dart';
 import 'package:cow_pregnancy/screens/add_edit_cow_screen.dart';
 import 'package:cow_pregnancy/utils/app_settings.dart';
 import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
+import 'package:cow_pregnancy/widgets/animated_action_card.dart';
 
 class CowDetailScreen extends ConsumerWidget {
   final Cow cow;
@@ -305,8 +306,7 @@ class CowDetailScreen extends ConsumerWidget {
                     children: [
                       if (currentCow.isInseminated && !currentCow.isPostBirth)
                         Expanded(
-                          child: _buildActionCard(
-                            context,
+                          child: AnimatedActionCard(
                             icon: Icons.child_friendly,
                             label: 'تسجيل ولادة',
                             color: Colors.teal,
@@ -317,8 +317,7 @@ class CowDetailScreen extends ConsumerWidget {
                       if (currentCow.isInseminated && !currentCow.isPostBirth)
                         const SizedBox(width: 12),
                       Expanded(
-                        child: _buildActionCard(
-                          context,
+                        child: AnimatedActionCard(
                           icon: Icons.science_outlined,
                           label: 'تسجيل تلقيح',
                           color: Colors.blueAccent,
@@ -331,8 +330,16 @@ class CowDetailScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  if (currentCow.isInseminated && !currentCow.isPostBirth)
-                    ...[],
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: AnimatedActionCard(
+                      icon: Icons.note_add_outlined,
+                      label: 'إضافة ملاحظة',
+                      color: Colors.orange,
+                      onTap: () => _showAddNoteDialog(context, ref, currentCow),
+                    ),
+                  ),
 
                   const SizedBox(height: 40),
                   const Text(
@@ -1147,6 +1154,101 @@ class CowDetailScreen extends ConsumerWidget {
                 'تأكيد وتسجيل',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddNoteDialog(BuildContext context, WidgetRef ref, Cow currentCow) {
+    final noteController = TextEditingController();
+    DateTime selectedDate = DateTime.now();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          title: const Text(
+            'إضافة ملاحظة',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                InkWell(
+                  onTap: () async {
+                    final picked = await showCustomDatePicker(
+                      context: context,
+                      initialDate: selectedDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime.now(),
+                      title: 'تاريخ الملاحظة',
+                    );
+                    if (picked != null) {
+                      setStateDialog(() => selectedDate = picked);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade400),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_today, size: 20),
+                        const SizedBox(width: 8),
+                        Text(DateFormat('yyyy-MM-dd').format(selectedDate)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: noteController,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: 'نص الملاحظة',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (noteController.text.trim().isEmpty) return;
+                
+                List<dynamic> newHistory = currentCow.history.toList();
+                newHistory.add({
+                  'title': 'ملاحظة',
+                  'date': selectedDate.toIso8601String(),
+                  'eventId': DateTime.now().millisecondsSinceEpoch.toString(),
+                  'note': noteController.text.trim(),
+                });
+
+                ref.read(cowProvider.notifier).updateCow(
+                  currentCow.copyWith(history: newHistory),
+                );
+
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('تمت إضافة الملاحظة بنجاح'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              },
+              child: const Text('إضافة'),
             ),
           ],
         ),

@@ -15,27 +15,7 @@ class CowCard extends ConsumerStatefulWidget {
   ConsumerState<CowCard> createState() => _CowCardState();
 }
 
-class _CowCardState extends ConsumerState<CowCard> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 150),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+class _CowCardState extends ConsumerState<CowCard> {
 
   @override
   Widget build(BuildContext context) {
@@ -52,16 +32,8 @@ class _CowCardState extends ConsumerState<CowCard> with SingleTickerProviderStat
           ),
         );
       },
-      child: AnimatedBuilder(
-        animation: _scaleAnimation,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: _scaleAnimation.value,
-            child: child,
-          );
-        },
-        child: Hero(
-          tag: 'cow_card_${widget.cow.uniqueKey}',
+      child: Hero(
+        tag: 'cow_card_${widget.cow.uniqueKey}',
           child: Card(
             elevation: 4,
             shadowColor: widget.cow.color.withOpacity(0.2),
@@ -73,9 +45,8 @@ class _CowCardState extends ConsumerState<CowCard> with SingleTickerProviderStat
               color: Colors.transparent,
               child: InkWell(
                 borderRadius: BorderRadius.circular(20),
-                onTapDown: (_) => _controller.forward(),
-                onTapUp: (_) => _controller.reverse(),
-                onTapCancel: () => _controller.reverse(),
+                splashColor: widget.cow.color.withValues(alpha: 0.25),
+                highlightColor: widget.cow.color.withValues(alpha: 0.15),
                 onTap: () {
                   Navigator.push(context, MaterialPageRoute(
                     builder: (_) => CowDetailScreen(cow: widget.cow)
@@ -100,8 +71,7 @@ class _CowCardState extends ConsumerState<CowCard> with SingleTickerProviderStat
                     ),
                   );
                 },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
+                child: Ink(
                   padding: const EdgeInsets.all(18.0),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(24),
@@ -206,13 +176,12 @@ class _CowCardState extends ConsumerState<CowCard> with SingleTickerProviderStat
                       _buildProgressBar(context, widget.cow),
                     ],
                   ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+                ),         // Ink
+              ),           // InkWell
+            ),             // Material
+          ),               // Card
+        ),                 // Hero
+    );                     // TweenAnimationBuilder
   }
 
   Widget _buildStatusChip(Cow cow) {

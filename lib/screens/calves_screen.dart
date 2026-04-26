@@ -663,25 +663,33 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                               ),
                             ),
                             elevation: calf['isExited'] == true ? 0 : 2,
-                            color: calf['isExited'] == true
-                                ? Colors.grey.withValues(alpha: 0.1)
-                                : null,
-                            child: InkWell(
-                              onTap: () async {
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        CalfDetailScreen(calfData: calf),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          CalfDetailScreen(calfData: calf),
+                                    ),
+                                  );
+                                  // Refresh UI if state changed
+                                  setState(() {});
+                                },
+                                onLongPress: () => _showCalfOptions(context, ref, calf),
+                                borderRadius: BorderRadius.circular(15),
+                                splashColor: calfColor.withValues(alpha: 0.25),
+                                highlightColor: calfColor.withValues(alpha: 0.15),
+                                child: Ink(
+                                  decoration: BoxDecoration(
+                                    color: calf['isExited'] == true
+                                        ? Colors.grey.withValues(alpha: 0.1)
+                                        : Theme.of(context).cardColor,
+                                    borderRadius: BorderRadius.circular(15),
                                   ),
-                                );
-                                // Refresh UI if state changed
-                                setState(() {});
-                              },
-                              onLongPress: () => _showCalfOptions(context, ref, calf),
-                              borderRadius: BorderRadius.circular(15),
-                              child: Stack(
-                                children: [
+                                  child: Stack(
+                                    children: [
                                   Padding(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 16,
@@ -852,6 +860,8 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                               ),
                             ),
                           ),
+                        ),
+                      ),
                           if (index == calves.length - 1)
                             const SizedBox(height: 100),
                         ],

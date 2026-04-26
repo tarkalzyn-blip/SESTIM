@@ -205,18 +205,43 @@ final cowProvider = NotifierProvider<CowNotifier, List<Cow>>(() {
 });
 
 enum CowFilter { all, pregnant, monitoring, notInseminated, postBirth }
-enum CowSort { none, closestToEvent }
+enum CowSortCriteria { id, inseminationDate, birthDate }
+enum CowSortOrder { ascending, descending }
 
-class SortNotifier extends Notifier<CowSort> {
-  @override
-  CowSort build() => CowSort.none;
+class CowSortState {
+  final CowSortCriteria criteria;
+  final CowSortOrder order;
 
-  void setSort(CowSort sort) {
-    state = sort;
+  const CowSortState({
+    this.criteria = CowSortCriteria.id,
+    this.order = CowSortOrder.ascending,
+  });
+
+  CowSortState copyWith({
+    CowSortCriteria? criteria,
+    CowSortOrder? order,
+  }) {
+    return CowSortState(
+      criteria: criteria ?? this.criteria,
+      order: order ?? this.order,
+    );
   }
 }
 
-final sortProvider = NotifierProvider<SortNotifier, CowSort>(() {
+class SortNotifier extends Notifier<CowSortState> {
+  @override
+  CowSortState build() => const CowSortState();
+
+  void setCriteria(CowSortCriteria criteria) {
+    state = state.copyWith(criteria: criteria);
+  }
+
+  void setOrder(CowSortOrder order) {
+    state = state.copyWith(order: order);
+  }
+}
+
+final sortProvider = NotifierProvider<SortNotifier, CowSortState>(() {
   return SortNotifier();
 });
 
@@ -258,11 +283,32 @@ final filteredCowsProvider = Provider<List<Cow>>((ref) {
       break;
   }
 
-  if (sort == CowSort.closestToEvent) {
-    result = List.from(result)..sort((a, b) => b.pregnancyPercentage.compareTo(a.pregnancyPercentage));
-  } else {
-    result = List.from(result)..sort((a, b) => a.id.compareTo(b.id));
-  }
+  final isAsc = sort.order == CowSortOrder.ascending;
+  
+  result = List.from(result)..sort((a, b) {
+    int cmp;
+    switch (sort.criteria) {
+      case CowSortCriteria.id:
+        // Try to sort numerically if possible
+        final aNum = int.tryParse(a.id);
+        final bNum = int.tryParse(b.id);
+        if (aNum != null && bNum != null) {
+          cmp = aNum.compareTo(bNum);
+        } else {
+          cmp = a.id.compareTo(b.id);
+        }
+        break;
+      case CowSortCriteria.inseminationDate:
+        cmp = a.inseminationDate.compareTo(b.inseminationDate);
+        break;
+      case CowSortCriteria.birthDate:
+        final aDate = a.birthDate ?? DateTime(1900);
+        final bDate = b.birthDate ?? DateTime(1900);
+        cmp = aDate.compareTo(bDate);
+        break;
+    }
+    return isAsc ? cmp : -cmp;
+  });
 
   return result;
 });
