@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'package:cow_pregnancy/widgets/custom_date_picker.dart';
 import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
+import 'package:cow_pregnancy/widgets/calf_search_delegate.dart';
 
 enum CalfSort { newest, oldest }
 
@@ -22,21 +23,19 @@ class CalvesScreen extends ConsumerStatefulWidget {
 }
 
 class _CalvesScreenState extends ConsumerState<CalvesScreen> {
-  bool _isSearching = false;
-  final TextEditingController _searchController = TextEditingController();
   CalfSort _currentSort = CalfSort.newest;
   CalfFilter _currentFilter = CalfFilter.active;
 
   @override
   void dispose() {
-    _searchController.dispose();
     super.dispose();
   }
 
   String _calculateAge(DateTime birthDate) {
     final now = DateTime.now();
-    final difference = now.difference(birthDate);
-    final days = difference.inDays;
+    final today = DateTime(now.year, now.month, now.day);
+    final birth = DateTime(birthDate.year, birthDate.month, birthDate.day);
+    final days = today.difference(birth).inDays;
 
     if (days < 30) return '$days يوم';
     if (days < 365) {
@@ -52,7 +51,10 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
   }
 
   int _calculateAgeInDays(DateTime birthDate) {
-    return DateTime.now().difference(birthDate).inDays;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final birth = DateTime(birthDate.year, birthDate.month, birthDate.day);
+    return today.difference(birth).inDays;
   }
 
   /// Matches a Hive history event to a calf by trying 3 strategies:
@@ -441,40 +443,19 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
   Widget build(BuildContext context) {
     final cows = ref.watch(cowProvider);
 
-    List<Map<String, dynamic>> calves = [];
-    for (var cow in cows) {
-      for (var event in cow.history) {
-        final title = event['title']?.toString() ?? '';
-        if (title == 'تسجيل ولادة' || title == 'تسجيل ولادة سابقة') {
-          calves.add({
-            'date': DateTime.parse(event['date']),
-            'originalEventDate': event['date'],
-            'eventId':
-                event['eventId']?.toString() ??
-                event['date'].toString(), // unique key for matching
-            'calfId': event['calfId'],
-            'calfColorValue':
-                event['calfColorValue'] ??
-                (event['note'].toString().contains('ذكر')
-                    ? Colors.blue.toARGB32()
-                    : Colors.pink.toARGB32()),
-            'note': event['note'] ?? '',
-            'motherId': cow.id,
-            'motherUniqueKey': cow.uniqueKey,
-            'motherColor': cow.color,
-            'isExited': event['isExited'] ?? false,
-            'exitReason': event['exitReason'],
-            'exitPrice': event['exitPrice'],
-            'exitDate': event['exitDate'],
-            'weights': event['weights'] ?? [],
-            'vaccines': event['vaccines'] ?? [],
-          });
-        }
-      }
-    }
+    // Optimized calf extraction using provider
+    final rawCalves = ref.watch(allCalvesProvider);
+    
+    List<Map<String, dynamic>> calves = rawCalves.map((c) => {
+      ...c,
+      'date': DateTime.parse(c['date'].toString()),
+      'eventId': c['eventId']?.toString() ?? c['date'].toString(),
+      'calfColorValue': c['calfColorValue'] ?? (c['note'].toString().contains('ذكر') ? Colors.blue.toARGB32() : Colors.pink.toARGB32()),
+      'weights': c['weights'] ?? [],
+      'vaccines': c['vaccines'] ?? [],
+    }).toList();
 
     final exactMatch = AppSettings.exactSearchMatch;
-    final query = _searchController.text.trim();
 
     final totalCount = calves.where((c) => c['isExited'] != true).length;
     final maleCount = calves
@@ -489,18 +470,7 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
         .length;
     final exitedCount = calves.where((c) => c['isExited'] == true).length;
 
-    if (query.isNotEmpty) {
-      calves = calves.where((calf) {
-        final calfId = calf['calfId']?.toString() ?? '';
-        final motherId = calf['motherId']?.toString() ?? '';
 
-        if (exactMatch) {
-          return calfId == query || motherId == query;
-        } else {
-          return calfId.contains(query) || motherId.contains(query);
-        }
-      }).toList();
-    }
 
     if (_currentFilter == CalfFilter.male) {
       calves = calves
@@ -533,74 +503,41 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: _isSearching
-            ? TextField(
-                controller: _searchController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'ابحث برقم العجل/الأم...',
-                  border: InputBorder.none,
-                ),
-                onChanged: (val) {
-                  setState(() {});
-                },
-              )
-            : const Text(
-                'سجل المواليد (العجول)',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-        centerTitle: !_isSearching,
+        title: const Text(
+          'سجل المواليد (العجول)',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.settings),
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+        ),
         actions: [
-          if (!_isSearching)
-            IconButton(
-              icon: const Icon(Icons.settings),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+          PopupMenuButton<CalfSort>(
+            icon: const Icon(Icons.sort),
+            tooltip: 'ترتيب العجول',
+            onSelected: (sort) {
+              setState(() {
+                _currentSort = sort;
+              });
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: CalfSort.newest,
+                child: Text('الأحدث أولاً'),
               ),
-            ),
-          if (_isSearching)
-            IconButton(
-              icon: const Icon(Icons.clear),
-              onPressed: () {
-                setState(() {
-                  if (_searchController.text.isEmpty) {
-                    _isSearching = false;
-                  } else {
-                    _searchController.clear();
-                  }
-                });
-              },
-            )
-          else ...[
-            PopupMenuButton<CalfSort>(
-              icon: const Icon(Icons.sort),
-              tooltip: 'ترتيب العجول',
-              onSelected: (sort) {
-                setState(() {
-                  _currentSort = sort;
-                });
-              },
-              itemBuilder: (context) => const [
-                PopupMenuItem(
-                  value: CalfSort.newest,
-                  child: Text('الأحدث أولاً'),
-                ),
-                PopupMenuItem(
-                  value: CalfSort.oldest,
-                  child: Text('الأقدم أولاً'),
-                ),
-              ],
-            ),
-            IconButton(
-              icon: const Icon(Icons.search),
-              onPressed: () {
-                setState(() {
-                  _isSearching = true;
-                });
-              },
-            ),
-          ],
+              PopupMenuItem(
+                value: CalfSort.oldest,
+                child: Text('الأقدم أولاً'),
+              ),
+            ],
+          ),
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              showSearch(context: context, delegate: CalfSearchDelegate(ref));
+            },
+          ),
         ],
       ),
       body: Column(
@@ -635,11 +572,9 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
           Expanded(
             child: calves.isEmpty
                 ? Center(
-                    child: Text(
-                      _isSearching
-                          ? 'لا توجد نتائج مطابقة للبحث'
-                          : 'لا توجد سجلات مواليد حالياً',
-                      style: const TextStyle(fontSize: 18, color: Colors.grey),
+                    child: const Text(
+                      'لا توجد سجلات مواليد حالياً',
+                      style: TextStyle(fontSize: 18, color: Colors.grey),
                     ),
                   )
                 : ListView.builder(

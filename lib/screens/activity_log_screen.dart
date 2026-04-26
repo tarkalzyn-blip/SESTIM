@@ -75,12 +75,10 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> with Sing
       appBar: AppBar(
         title: const Text('📜 سجل النشاطات', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
-          ),
-        ],
+        leading: IconButton(
+          icon: const Icon(Icons.settings),
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+        ),
         bottom: TabBar(
           controller: _tabController,
           isScrollable: false,
@@ -196,7 +194,7 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> with Sing
     final date = DateTime.parse(item[type == LogType.sale || type == LogType.death ? 'exitDate' : 'date']);
     final birthDate = DateTime.parse(item['date']);
     final ageDays = type == LogType.sale || type == LogType.death 
-        ? date.difference(birthDate).inDays 
+        ? DateTime(date.year, date.month, date.day).difference(DateTime(birthDate.year, birthDate.month, birthDate.day)).inDays 
         : 0;
 
     String titleText = '';

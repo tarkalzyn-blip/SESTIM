@@ -8,6 +8,7 @@ import 'package:cow_pregnancy/providers/cow_provider.dart';
 import 'package:cow_pregnancy/screens/add_edit_cow_screen.dart';
 import 'package:cow_pregnancy/utils/app_settings.dart';
 import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
+import 'package:cow_pregnancy/screens/settings_screen.dart';
 import 'package:cow_pregnancy/widgets/animated_action_card.dart';
 
 class CowDetailScreen extends ConsumerWidget {
@@ -36,6 +37,16 @@ class CowDetailScreen extends ConsumerWidget {
           SliverAppBar(
             expandedHeight: 250,
             pinned: true,
+            leadingWidth: 100,
+            leading: Row(
+              children: [
+                const BackButton(color: Colors.white),
+                IconButton(
+                  icon: const Icon(Icons.settings, color: Colors.white),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                ),
+              ],
+            ),
             actions: [
               IconButton(
                 icon: const Icon(Icons.edit, color: Colors.white),
@@ -212,7 +223,7 @@ class CowDetailScreen extends ConsumerWidget {
                       currentCow.bullId!.isNotEmpty) ...[
                     const SizedBox(height: 20),
                     _buildDetailRow(
-                      'معلومات الطلوقة',
+                      'رقم العجل',
                       currentCow.bullId!,
                       Icons.pets,
                       color: Colors.blueGrey,
@@ -872,7 +883,7 @@ class CowDetailScreen extends ConsumerWidget {
               TextField(
                 controller: bullController,
                 decoration: InputDecoration(
-                  labelText: 'اسم/رقم الطلوقة',
+                  labelText: 'رقم العجل',
                   prefixIcon: const Icon(Icons.pets),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -912,7 +923,7 @@ class CowDetailScreen extends ConsumerWidget {
                   'date': selectedDate.toIso8601String(),
                   'eventId': (DateTime.now().millisecondsSinceEpoch + 1)
                       .toString(),
-                  'note': 'تلقيح جديد من الطلوقة: ${bullController.text}',
+                  'note': 'رقم العجل: ${bullController.text}',
                 });
 
                 // Update the cow's main insemination date and status

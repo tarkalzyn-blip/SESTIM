@@ -4,7 +4,9 @@ import 'package:cow_pregnancy/providers/cow_provider.dart';
 import 'package:cow_pregnancy/providers/notes_provider.dart';
 import 'package:cow_pregnancy/models/cow_model.dart';
 import 'package:cow_pregnancy/services/notification_service.dart';
+import 'package:cow_pregnancy/screens/settings_screen.dart';
 import 'package:uuid/uuid.dart';
+
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:cow_pregnancy/utils/date_picker_utils.dart';
 
@@ -28,6 +30,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.settings),
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+        ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
       floatingActionButton: Padding(

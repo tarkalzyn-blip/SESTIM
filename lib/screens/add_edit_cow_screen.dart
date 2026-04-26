@@ -4,6 +4,7 @@ import 'package:cow_pregnancy/models/cow_model.dart';
 import 'package:cow_pregnancy/providers/cow_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:cow_pregnancy/widgets/custom_date_picker.dart';
+import 'package:cow_pregnancy/screens/settings_screen.dart';
 
 enum CowFormState { pregnant, heat, postBirth }
 
@@ -73,35 +74,31 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
 
   void _save() {
     if (_formKey.currentState!.validate()) {
-      if (widget.cow != null) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('تأكيد التعديل', style: TextStyle(fontWeight: FontWeight.bold)),
-            content: const Text('هل أنت متأكد من حفظ التعديلات على هذه البقرة؟'),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx), 
-                child: const Text('إلغاء', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(widget.cow == null ? 'تأكيد الإضافة' : 'تأكيد التعديل', style: const TextStyle(fontWeight: FontWeight.bold)),
+          content: Text(widget.cow == null ? 'هل أنت متأكد من إضافة هذه البقرة الجديدة؟' : 'هل أنت متأكد من حفظ التعديلات على هذه البقرة؟'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx), 
+              child: const Text('إلغاء', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.blue,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _processSave();
-                },
-                child: const Text('حفظ', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-        );
-      } else {
-        _processSave();
-      }
+              onPressed: () {
+                Navigator.pop(ctx);
+                _processSave();
+              },
+              child: const Text('حفظ', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -133,7 +130,7 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
           'note':
               _currentState == CowFormState.pregnant &&
                   _bullIdController.text.isNotEmpty
-              ? 'طلوقة/عجل: ${_bullIdController.text}'
+              ? 'رقم العجل: ${_bullIdController.text}'
               : '',
         });
       }
@@ -243,6 +240,16 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.cow == null ? 'إضافة بقرة جديدة' : 'تعديل بقرة'),
+        leadingWidth: 100,
+        leading: Row(
+          children: [
+            const BackButton(),
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+            ),
+          ],
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
@@ -311,7 +318,7 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
                   TextFormField(
                     controller: _bullIdController,
                     decoration: InputDecoration(
-                      labelText: 'رقم/اسم الطلوقة (اختياري)',
+                      labelText: 'رقم العجل (اختياري)',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),

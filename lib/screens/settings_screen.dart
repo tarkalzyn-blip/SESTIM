@@ -7,6 +7,7 @@ import 'package:cow_pregnancy/providers/cow_provider.dart';
 import 'package:cow_pregnancy/providers/alerts_provider.dart';
 import 'package:cow_pregnancy/services/notification_service.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:cow_pregnancy/screens/about_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -60,9 +61,40 @@ class SettingsScreen extends ConsumerWidget {
 
             const SizedBox(height: 32),
             
+            // About Section
+            _sectionHeader('حول التطبيق'),
+            const SizedBox(height: 8),
+            _buildSettingsTile(
+              context,
+              icon: Icons.info_outline,
+              color: Colors.blueGrey,
+              title: 'لمحة عنا',
+              subtitle: 'معلومات عن النظام وأهداف التطبيق',
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutScreen())),
+            ),
+
+            const SizedBox(height: 32),
+            
             // Logout Button
             _buildLogoutButton(context, ref),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionHeader(String title) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: const EdgeInsets.only(right: 8, bottom: 8),
+        child: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey,
+          ),
         ),
       ),
     );

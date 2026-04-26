@@ -18,11 +18,11 @@ class CowsListScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('إدارة الأبقار', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.settings),
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
-          ),
           IconButton(
             icon: const Icon(Icons.sort),
             tooltip: 'فرز الأبقار',

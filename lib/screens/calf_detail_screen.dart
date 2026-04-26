@@ -4,6 +4,7 @@ import 'package:cow_pregnancy/providers/cow_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:cow_pregnancy/widgets/custom_date_picker.dart';
 import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
+import 'package:cow_pregnancy/screens/settings_screen.dart';
 
 class CalfDetailScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> calfData;
@@ -437,6 +438,16 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
+        leadingWidth: 100,
+        leading: Row(
+          children: [
+            const BackButton(),
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+            ),
+          ],
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

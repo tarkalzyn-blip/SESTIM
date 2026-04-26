@@ -41,6 +41,22 @@ Future<DateTime?> showCustomDatePicker({
   );
 }
 
+Future<Map<String, int>?> showYearMonthPicker({
+  required BuildContext context,
+  required int initialYear,
+  required int initialMonth,
+  String? title,
+}) async {
+  return await showDialog<Map<String, int>>(
+    context: context,
+    builder: (context) => _YearMonthPickerDialog(
+      initialYear: initialYear,
+      initialMonth: initialMonth,
+      title: title,
+    ),
+  );
+}
+
 class _DatePickerDialog extends StatefulWidget {
   final DateTime initialDate;
   final DateTime? firstDate;
@@ -494,6 +510,335 @@ class _DatePickerDialogState extends State<_DatePickerDialog> {
       magnification: 1.0,
       onSelectedItemChanged: onChanged,
       clipBehavior: Clip.none, // Prevent text clipping on squeezed items
+      childDelegate: count != null 
+          ? ListWheelChildBuilderDelegate(builder: itemBuilder, childCount: count)
+          : ListWheelChildBuilderDelegate(builder: itemBuilder),
+    );
+  }
+}
+
+class _YearMonthPickerDialog extends StatefulWidget {
+  final int initialYear;
+  final int initialMonth;
+  final String? title;
+
+  const _YearMonthPickerDialog({
+    required this.initialYear,
+    required this.initialMonth,
+    this.title,
+  });
+
+  @override
+  State<_YearMonthPickerDialog> createState() => _YearMonthPickerDialogState();
+}
+
+class _YearMonthPickerDialogState extends State<_YearMonthPickerDialog> {
+  late int _selectedMonth;
+  late int _selectedYear;
+
+  late FixedExtentScrollController _monthController;
+  late FixedExtentScrollController _yearController;
+
+  late int _yearStart;
+  late int _yearRange;
+
+  static const int _poolSize = 4;
+  late List<AudioPlayer> _pool;
+  int _poolIdx = 0;
+  bool _audioReady = false;
+  bool _isConfirmPressed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedMonth = widget.initialMonth;
+    _selectedYear = widget.initialYear;
+
+    final today = DateTime.now();
+    _yearRange = 100;
+    _yearStart = today.year - 50;
+
+    _monthController = FixedExtentScrollController(
+      initialItem: _kLoop + (_selectedMonth - 1),
+    );
+    _yearController = FixedExtentScrollController(
+      initialItem: _selectedYear - _yearStart,
+    );
+
+    _lastMonthIdx = _monthController.initialItem;
+    _lastYearIdx = _yearController.initialItem;
+
+    _monthController.addListener(() => _checkScrollSound(_monthController, 1));
+    _yearController.addListener(() => _checkScrollSound(_yearController, 2));
+
+    _currentSound = AppSettings.datePickerSound;
+    _initAudio();
+  }
+
+  late int _lastMonthIdx;
+  late int _lastYearIdx;
+  late String _currentSound;
+
+  void _checkScrollSound(FixedExtentScrollController controller, int type) {
+    if (!controller.hasClients) return;
+    final currentIdx = (controller.offset / 65.0).round();
+    if (type == 1 && currentIdx != _lastMonthIdx) {
+      _lastMonthIdx = currentIdx;
+      _triggerFeedback();
+    } else if (type == 2 && currentIdx != _lastYearIdx) {
+      _lastYearIdx = currentIdx;
+      _triggerFeedback();
+    }
+  }
+
+  Future<void> _initAudio() async {
+    try {
+      final soundFile = AppSettings.datePickerSound;
+      _pool = List.generate(_poolSize, (_) => AudioPlayer());
+      for (final p in _pool) {
+        await p.setPlayerMode(PlayerMode.lowLatency);
+        await p.setReleaseMode(ReleaseMode.stop);
+        await p.setVolume(1.0);
+        await p.setSource(AssetSource('sounds/$soundFile'));
+      }
+      _audioReady = true;
+    } catch (e) {
+      debugPrint('Audio init error: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _monthController.dispose();
+    _yearController.dispose();
+    if (_audioReady) {
+      for (final p in _pool) {
+        p.dispose();
+      }
+    }
+    super.dispose();
+  }
+
+  void _triggerFeedback() {
+    HapticFeedback.selectionClick();
+    if (_audioReady) {
+      for (final p in _pool) {
+        p.stop();
+      }
+      final player = _pool[_poolIdx];
+      _poolIdx = (_poolIdx + 1) % _poolSize;
+      player.play(AssetSource('sounds/$_currentSound'), mode: PlayerMode.lowLatency).catchError((_) {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final Color bgColor = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+    final Color selectedColor = isDark ? const Color(0xFF0A84FF) : const Color(0xFF007AFF);
+    final Color unselectedColor = isDark
+        ? Colors.white.withValues(alpha: 0.40)
+        : Colors.black.withValues(alpha: 0.40);
+    final Color highlightBg = isDark
+        ? Colors.white.withValues(alpha: 0.04)
+        : Colors.black.withValues(alpha: 0.03);
+    final Color cancelBg = isDark
+        ? Colors.white.withValues(alpha: 0.1)
+        : Colors.black.withValues(alpha: 0.07);
+
+    const double itemH = 65.0;
+    const double pickerH = itemH * 5.0;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Container(
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.18),
+              blurRadius: 40,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 22),
+            if (widget.title != null)
+              Text(
+                widget.title!,
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              ),
+            const SizedBox(height: 12),
+            ClipRect(
+              child: SizedBox(
+                height: pickerH,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      height: itemH,
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: highlightBg,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(child: Center(child: Text('اختر الشهر', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: unselectedColor)))),
+                              Expanded(child: Center(child: Text('اختر السنة', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: unselectedColor)))),
+                            ],
+                          ),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: _buildWheel(
+                                    controller: _monthController,
+                                    itemH: itemH,
+                                    onChanged: (idx) => setState(() => _selectedMonth = (idx % 12) + 1),
+                                    itemBuilder: (ctx, i) {
+                                      final month = (i % 12) + 1;
+                                      final isSelected = month == _selectedMonth;
+                                      return Center(
+                                        child: Text(
+                                          month.toString().padLeft(2, '0'),
+                                          style: TextStyle(
+                                            fontSize: isSelected ? 24.5 : 22,
+                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                            color: isSelected ? selectedColor : unselectedColor,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _buildWheel(
+                                    controller: _yearController,
+                                    itemH: itemH,
+                                    count: _yearRange + 1,
+                                    onChanged: (idx) => setState(() => _selectedYear = _yearStart + idx),
+                                    itemBuilder: (ctx, i) {
+                                      final year = _yearStart + i;
+                                      final isSelected = year == _selectedYear;
+                                      return Center(
+                                        child: Text(
+                                          year.toString(),
+                                          style: TextStyle(
+                                            fontSize: isSelected ? 24.5 : 22,
+                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                            color: isSelected ? selectedColor : unselectedColor,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTapDown: (_) => setState(() => _isConfirmPressed = true),
+                      onTapUp: (_) => setState(() => _isConfirmPressed = false),
+                      onTapCancel: () => setState(() => _isConfirmPressed = false),
+                      onTap: () async {
+                        setState(() => _isConfirmPressed = true);
+                        await Future.delayed(const Duration(milliseconds: 100));
+                        if (mounted) {
+                          Navigator.pop(context, {'year': _selectedYear, 'month': _selectedMonth});
+                        }
+                      },
+                      child: TweenAnimationBuilder<Color?>(
+                        duration: const Duration(milliseconds: 200),
+                        tween: ColorTween(
+                          begin: selectedColor,
+                          end: _isConfirmPressed ? selectedColor.withValues(alpha: 0.7) : selectedColor,
+                        ),
+                        builder: (context, color, child) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: _isConfirmPressed ? [] : [
+                                BoxShadow(
+                                  color: selectedColor.withValues(alpha: 0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            alignment: Alignment.center,
+                            child: const Text(
+                              'حسناً',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        decoration: BoxDecoration(color: cancelBg, borderRadius: BorderRadius.circular(14)),
+                        alignment: Alignment.center,
+                        child: Text('إلغاء', style: TextStyle(color: isDark ? Colors.white60 : Colors.black54)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWheel({
+    required FixedExtentScrollController controller,
+    required double itemH,
+    required ValueChanged<int> onChanged,
+    required IndexedWidgetBuilder itemBuilder,
+    int? count,
+  }) {
+    return ListWheelScrollView.useDelegate(
+      controller: controller,
+      itemExtent: itemH,
+      physics: const MediumSpeedScrollPhysics(),
+      diameterRatio: 1.5,
+      squeeze: 1.25,
+      onSelectedItemChanged: onChanged,
       childDelegate: count != null 
           ? ListWheelChildBuilderDelegate(builder: itemBuilder, childCount: count)
           : ListWheelChildBuilderDelegate(builder: itemBuilder),

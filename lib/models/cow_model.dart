@@ -86,11 +86,20 @@ class Cow {
   Color get color => Color(colorValue);
 
   int get daysSinceInsemination {
-    return DateTime.now().difference(inseminationDate).inDays;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final insem = DateTime(inseminationDate.year, inseminationDate.month, inseminationDate.day);
+    return today.difference(insem).inDays;
   }
 
   bool get isPostBirth => birthDate != null && birthDate!.isAfter(inseminationDate);
-  int get daysSinceBirth => isPostBirth ? DateTime.now().difference(birthDate!).inDays : 0;
+  int get daysSinceBirth {
+    if (!isPostBirth) return 0;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final birth = DateTime(birthDate!.year, birthDate!.month, birthDate!.day);
+    return today.difference(birth).inDays;
+  }
 
   double get pregnancyPercentage {
     if (isPostBirth) {

@@ -97,21 +97,25 @@ class CowNotifier extends Notifier<List<Cow>> {
     final user = ref.read(appUserProvider);
     final cowWithUser = cow.copyWith(userId: user?.id);
     
-    await Hive.box<Cow>('cows').put(cow.uniqueKey, cowWithUser);
+    final box = Hive.box<Cow>('cows');
+    await box.put(cow.uniqueKey, cowWithUser);
     
-    // Update state immediately for responsive UI (Optimistic UI)
-    state = Hive.box<Cow>('cows').values.toList();
+    // Update state IMMEDIATELY with a fresh sorted list from Hive
+    // This ensures offline additions show up instantly
+    final updatedList = box.values.toList();
+    state = updatedList;
     
-    await NotificationService().scheduleCowNotifications(cowWithUser);
+    // Schedule notifications in background
+    NotificationService().scheduleCowNotifications(cowWithUser);
     
     if (user != null) {
-      try {
-        await _firestore.saveCow(cowWithUser);
+      // Sync to cloud in background without blocking UI
+      _firestore.saveCow(cowWithUser).then((_) {
         ref.read(syncStatusProvider.notifier).setStatus(null);
-      } catch (e) {
+      }).catchError((e) {
         debugPrint("Firestore save failed: $e");
         ref.read(syncStatusProvider.notifier).setStatus("فشل المزامنة: $e");
-      }
+      });
     }
   }
 
@@ -122,53 +126,37 @@ class CowNotifier extends Notifier<List<Cow>> {
     final box = Hive.box<Cow>('cows');
     if (oldKey != null && oldKey != cow.uniqueKey) {
       await box.delete(oldKey);
-      await NotificationService().cancelCowNotifications(oldKey);
+      NotificationService().cancelCowNotifications(oldKey);
       if (user != null) {
-        try {
-          await _firestore.deleteCow(oldKey);
-          ref.read(syncStatusProvider.notifier).setStatus(null);
-        } catch (e) {
-          debugPrint("Firestore delete failed: $e");
-          ref.read(syncStatusProvider.notifier).setStatus("فشل الحذف السحابي: $e");
-        }
+        _firestore.deleteCow(oldKey).catchError((e) => debugPrint("Cloud delete fail: $e"));
       }
     }
     
     await box.put(cow.uniqueKey, cowWithUser);
     
-    // Update state immediately for responsive UI
-    state = box.values.toList();
+    // Refresh local state immediately
+    final updatedList = box.values.toList();
+    state = updatedList;
     
-    await NotificationService().scheduleCowNotifications(cowWithUser);
+    NotificationService().scheduleCowNotifications(cowWithUser);
     
     if (user != null) {
-      try {
-        await _firestore.saveCow(cowWithUser);
-        ref.read(syncStatusProvider.notifier).setStatus(null);
-      } catch (e) {
-        debugPrint("Firestore save failed: $e");
-        ref.read(syncStatusProvider.notifier).setStatus("فشل المزامنة: $e");
-      }
+      _firestore.saveCow(cowWithUser).catchError((e) => debugPrint("Cloud update fail: $e"));
     }
   }
 
   Future<void> deleteCow(String uniqueKey) async {
     final user = ref.read(appUserProvider);
-    await Hive.box<Cow>('cows').delete(uniqueKey);
+    final box = Hive.box<Cow>('cows');
+    await box.delete(uniqueKey);
     
-    // Update state immediately for responsive UI
-    state = Hive.box<Cow>('cows').values.toList();
+    // Refresh local state immediately
+    state = box.values.toList();
     
-    await NotificationService().cancelCowNotifications(uniqueKey);
+    NotificationService().cancelCowNotifications(uniqueKey);
     
     if (user != null) {
-      try {
-        await _firestore.deleteCow(uniqueKey);
-        ref.read(syncStatusProvider.notifier).setStatus(null);
-      } catch (e) {
-        debugPrint("Firestore delete failed: $e");
-        ref.read(syncStatusProvider.notifier).setStatus("فشل الحذف السحابي: $e");
-      }
+      _firestore.deleteCow(uniqueKey).catchError((e) => debugPrint("Cloud delete fail: $e"));
     }
   }
 
@@ -289,7 +277,6 @@ final filteredCowsProvider = Provider<List<Cow>>((ref) {
     int cmp;
     switch (sort.criteria) {
       case CowSortCriteria.id:
-        // Try to sort numerically if possible
         final aNum = int.tryParse(a.id);
         final bNum = int.tryParse(b.id);
         if (aNum != null && bNum != null) {
@@ -311,4 +298,74 @@ final filteredCowsProvider = Provider<List<Cow>>((ref) {
   });
 
   return result;
+});
+
+/// Optimized provider for extracting calves from history (Performance Fix)
+final allCalvesProvider = Provider<List<Map<String, dynamic>>>((ref) {
+  final cows = ref.watch(cowProvider);
+  final List<Map<String, dynamic>> calves = [];
+
+  for (var cow in cows) {
+    for (var event in cow.history) {
+      final title = event['title']?.toString() ?? '';
+      if (title == 'تسجيل ولادة' || title == 'تسجيل ولادة سابقة') {
+        calves.add({
+          ...event,
+          'motherId': cow.id,
+          'motherUniqueKey': cow.uniqueKey,
+          'motherColor': cow.color,
+          'originalEventDate': event['date'],
+        });
+      }
+    }
+  }
+  return calves;
+});
+
+/// Optimized provider for birth stats (Performance Fix)
+final birthStatsProvider = Provider<Map<String, dynamic>>((ref) {
+  final cows = ref.watch(cowProvider);
+  
+  int totalCalves = 0, maleCalves = 0, femaleCalves = 0;
+  int exitedSold = 0, exitedDead = 0, exitedTransfer = 0, exitedDeleted = 0;
+  
+  for (var cow in cows) {
+    for (var event in cow.history) {
+      final title = (event['title'] ?? '').toString().toLowerCase();
+      final note = (event['note'] ?? '').toString().toLowerCase();
+      final calfId = (event['calfId'] ?? '').toString().toLowerCase();
+
+      if (title.contains('ولادة') || title.contains('birth') || 
+          note.contains('ولادة') || note.contains('birth') || 
+          calfId.isNotEmpty) {
+        
+        totalCalves++;
+        
+        if (note.contains('ذكر') || note.contains('عجل') || calfId.contains('ذكر') || (event['calfColorValue'] == 0xFF2196F3)) {
+          maleCalves++;
+        } else {
+          femaleCalves++;
+        }
+        
+        if (event.containsKey('exitReason')) {
+          final reason = event['exitReason'].toString().toLowerCase();
+          if (reason.contains('بيع')) exitedSold++;
+          else if (reason.contains('موت')) exitedDead++;
+          else if (reason.contains('نقل')) exitedTransfer++;
+          else exitedDeleted++;
+        }
+      }
+    }
+  }
+
+  return {
+    'total': totalCalves,
+    'male': maleCalves,
+    'female': femaleCalves,
+    'sold': exitedSold,
+    'dead': exitedDead,
+    'transfer': exitedTransfer,
+    'deleted': exitedDeleted,
+    'active': totalCalves - (exitedSold + exitedDead + exitedTransfer + exitedDeleted),
+  };
 });

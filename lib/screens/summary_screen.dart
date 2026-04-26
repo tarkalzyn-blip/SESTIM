@@ -109,15 +109,13 @@ class SummaryScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('اللوحة الذكية', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
-            },
-            tooltip: 'الإعدادات',
-          ),
-        ],
+        leading: IconButton(
+          icon: const Icon(Icons.settings),
+          onPressed: () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+          },
+          tooltip: 'الإعدادات',
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
