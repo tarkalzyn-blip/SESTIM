@@ -73,7 +73,40 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
 
   void _save() {
     if (_formKey.currentState!.validate()) {
-      bool isInseminated = _currentState == CowFormState.pregnant;
+      if (widget.cow != null) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('تأكيد التعديل', style: TextStyle(fontWeight: FontWeight.bold)),
+            content: const Text('هل أنت متأكد من حفظ التعديلات على هذه البقرة؟'),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx), 
+                child: const Text('إلغاء', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _processSave();
+                },
+                child: const Text('حفظ', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      } else {
+        _processSave();
+      }
+    }
+  }
+
+  void _processSave() {
+    bool isInseminated = _currentState == CowFormState.pregnant;
       DateTime inseminationDate = _selectedDate;
       DateTime? birthDate;
 
@@ -174,7 +207,6 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
         ),
       );
       Navigator.pop(context);
-    }
   }
 
   Widget _buildAnimatedItem(Widget child, int delay) {

@@ -6,6 +6,7 @@ import 'package:cow_pregnancy/models/cow_model.dart';
 import 'package:cow_pregnancy/services/notification_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:cow_pregnancy/utils/date_picker_utils.dart';
 
 class NotesScreen extends ConsumerStatefulWidget {
   const NotesScreen({super.key});
@@ -22,7 +23,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('الملاحظات', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'الملاحظات',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
@@ -49,7 +53,12 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
               ),
             )
           : ListView.builder(
-              padding: const EdgeInsets.only(bottom: 100, top: 16, left: 16, right: 16),
+              padding: const EdgeInsets.only(
+                bottom: 100,
+                top: 16,
+                left: 16,
+                right: 16,
+              ),
               itemCount: notes.length,
               itemBuilder: (context, index) {
                 final note = notes[index];
@@ -72,7 +81,9 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
       ),
       builder: (context) {
         return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
           child: _AddNoteForm(noteToEdit: noteToEdit),
         );
       },
@@ -130,16 +141,22 @@ class _NoteCard extends ConsumerWidget {
                     radius: 8,
                   ),
                   const SizedBox(width: 8),
-                  Text('بقرة #${note.cowId}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text(
+                    'بقرة #${note.cowId}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
                   const Spacer(),
                   const Icon(Icons.edit_note, color: Colors.grey, size: 20),
                 ],
               ),
               const SizedBox(height: 12),
               Text(
-                note.noteText, 
+                note.noteText,
                 style: const TextStyle(
-                  fontSize: 17, 
+                  fontSize: 17,
                   height: 1.5,
                   fontWeight: FontWeight.w500,
                 ),
@@ -158,8 +175,14 @@ class _NoteCard extends ConsumerWidget {
                         const Icon(Icons.alarm, size: 16, color: Colors.orange),
                         const SizedBox(width: 4),
                         Text(
-                          DateFormat('yyyy-MM-dd HH:mm').format(note.reminderDate!),
-                          style: const TextStyle(color: Colors.orange, fontSize: 13, fontWeight: FontWeight.bold),
+                          DateFormat(
+                            'yyyy-MM-dd HH:mm',
+                          ).format(note.reminderDate!),
+                          style: const TextStyle(
+                            color: Colors.orange,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
@@ -167,15 +190,22 @@ class _NoteCard extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.timer, size: 16, color: Theme.of(context).colorScheme.primary),
+                    Icon(
+                      Icons.timer,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       'مضى ${DateTime.now().difference(note.startDate).inDays} يوم',
@@ -220,8 +250,12 @@ class _AddNoteFormState extends ConsumerState<_AddNoteForm> {
       _startDate = widget.noteToEdit!.startDate;
       if (widget.noteToEdit!.reminderDate != null) {
         _hasReminder = true;
-        _selectedTime = TimeOfDay.fromDateTime(widget.noteToEdit!.reminderDate!);
-        final diff = widget.noteToEdit!.reminderDate!.difference(DateTime.now()).inDays;
+        _selectedTime = TimeOfDay.fromDateTime(
+          widget.noteToEdit!.reminderDate!,
+        );
+        final diff = widget.noteToEdit!.reminderDate!
+            .difference(DateTime.now())
+            .inDays;
         _daysController.text = diff > 0 ? diff.toString() : '1';
       }
       // Delay fetching the cow until the build phase completes so ref is available
@@ -229,7 +263,9 @@ class _AddNoteFormState extends ConsumerState<_AddNoteForm> {
         final cows = ref.read(cowProvider);
         try {
           setState(() {
-            _selectedCow = cows.firstWhere((c) => c.id == widget.noteToEdit!.cowId);
+            _selectedCow = cows.firstWhere(
+              (c) => c.id == widget.noteToEdit!.cowId,
+            );
           });
         } catch (_) {}
       });
@@ -256,11 +292,12 @@ class _AddNoteFormState extends ConsumerState<_AddNoteForm> {
   }
 
   Future<void> _pickStartDate() async {
-    final date = await showDatePicker(
+    final date = await showCustomDatePicker(
       context: context,
       initialDate: _startDate,
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
+      title: 'تاريخ بدء العداد',
     );
     if (date != null) {
       setState(() {
@@ -271,18 +308,74 @@ class _AddNoteFormState extends ConsumerState<_AddNoteForm> {
 
   void _saveNote() {
     if (_selectedCow == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الرجاء اختيار البقرة')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('الرجاء اختيار البقرة')));
       return;
     }
     if (_noteController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الرجاء كتابة الملاحظة')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('الرجاء كتابة الملاحظة')));
       return;
     }
 
+    final noteId = widget.noteToEdit?.id ?? const Uuid().v4();
+
+    if (widget.noteToEdit != null) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text(
+            'تأكيد التعديل',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            'هل أنت متأكد من حفظ التعديلات على هذه الملاحظة؟',
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(
+                'إلغاء',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.blue,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _processSaveNote(noteId);
+              },
+              child: const Text(
+                'حفظ',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      _processSaveNote(noteId);
+    }
+  }
+
+  void _processSaveNote(String noteId) {
     DateTime? reminderDate;
     if (_hasReminder && _daysController.text.isNotEmpty) {
       int days = int.tryParse(_daysController.text) ?? 0;
-      if (days > 0) {
+      if (days >= 0) {
         final now = DateTime.now();
         reminderDate = DateTime(
           now.year,
@@ -291,22 +384,34 @@ class _AddNoteFormState extends ConsumerState<_AddNoteForm> {
           _selectedTime.hour,
           _selectedTime.minute,
         );
-        
-        final noteId = const Uuid().v4();
+
+        if (reminderDate.isBefore(now)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('الوقت المختار قد مضى، يرجى اختيار وقت قادم'),
+            ),
+          );
+          return;
+        }
+
+        final stableId = noteId.substring(0, 8).hashCode;
+
         NotificationService().scheduleCustomNotification(
-          id: noteId.hashCode,
+          id: stableId,
           title: 'تذكير: بقرة #${_selectedCow!.id}',
           body: _noteController.text,
           scheduledDate: reminderDate,
         );
       }
-    } else if (widget.noteToEdit != null && widget.noteToEdit!.reminderDate != null) {
+    } else if (widget.noteToEdit != null &&
+        widget.noteToEdit!.reminderDate != null) {
       // Cancel the old notification if the reminder was removed during edit
-      NotificationService().cancelCustomNotification(widget.noteToEdit!.id.hashCode);
+      final stableId = widget.noteToEdit!.id.substring(0, 8).hashCode;
+      NotificationService().cancelCustomNotification(stableId);
     }
 
     final newNote = NoteModel(
-      id: widget.noteToEdit?.id ?? const Uuid().v4(),
+      id: noteId,
       cowId: _selectedCow!.id,
       cowColorValue: _selectedCow!.colorValue,
       noteText: _noteController.text.trim(),
@@ -320,7 +425,7 @@ class _AddNoteFormState extends ConsumerState<_AddNoteForm> {
     } else {
       ref.read(notesProvider.notifier).addNote(newNote);
     }
-    
+
     Navigator.pop(context);
   }
 
@@ -334,9 +439,12 @@ class _AddNoteFormState extends ConsumerState<_AddNoteForm> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('إضافة ملاحظة جديدة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text(
+            'إضافة ملاحظة جديدة',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 20),
-          
+
           // Autocomplete for cow
           Autocomplete<Cow>(
             displayStringForOption: (Cow option) => option.id,
@@ -344,36 +452,44 @@ class _AddNoteFormState extends ConsumerState<_AddNoteForm> {
               if (textEditingValue.text.isEmpty) {
                 return const Iterable<Cow>.empty();
               }
-              return cows.where((cow) => cow.id.contains(textEditingValue.text));
+              return cows.where(
+                (cow) => cow.id.contains(textEditingValue.text),
+              );
             },
             onSelected: (Cow selection) {
               setState(() {
                 _selectedCow = selection;
               });
             },
-            fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
-              return TextField(
-                controller: textEditingController,
-                focusNode: focusNode,
-                decoration: InputDecoration(
-                  labelText: 'اختر البقرة (اكتب رقمها)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: _selectedCow != null
-                      ? Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: CircleAvatar(backgroundColor: _selectedCow!.color, radius: 10),
-                        )
-                      : const Icon(Icons.search),
-                ),
-                onChanged: (val) {
-                  if (_selectedCow != null && _selectedCow!.id != val) {
-                    setState(() {
-                      _selectedCow = null;
-                    });
-                  }
+            fieldViewBuilder:
+                (context, textEditingController, focusNode, onFieldSubmitted) {
+                  return TextField(
+                    controller: textEditingController,
+                    focusNode: focusNode,
+                    decoration: InputDecoration(
+                      labelText: 'اختر البقرة (اكتب رقمها)',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      prefixIcon: _selectedCow != null
+                          ? Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: CircleAvatar(
+                                backgroundColor: _selectedCow!.color,
+                                radius: 10,
+                              ),
+                            )
+                          : const Icon(Icons.search),
+                    ),
+                    onChanged: (val) {
+                      if (_selectedCow != null && _selectedCow!.id != val) {
+                        setState(() {
+                          _selectedCow = null;
+                        });
+                      }
+                    },
+                  );
                 },
-              );
-            },
             optionsViewBuilder: (context, onSelected, options) {
               return Align(
                 alignment: Alignment.topLeft,
@@ -381,14 +497,20 @@ class _AddNoteFormState extends ConsumerState<_AddNoteForm> {
                   elevation: 4,
                   borderRadius: BorderRadius.circular(12),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: 200, maxWidth: MediaQuery.of(context).size.width - 40),
+                    constraints: BoxConstraints(
+                      maxHeight: 200,
+                      maxWidth: MediaQuery.of(context).size.width - 40,
+                    ),
                     child: ListView.builder(
                       padding: EdgeInsets.zero,
                       itemCount: options.length,
                       itemBuilder: (BuildContext context, int index) {
                         final Cow option = options.elementAt(index);
                         return ListTile(
-                          leading: CircleAvatar(backgroundColor: option.color, radius: 12),
+                          leading: CircleAvatar(
+                            backgroundColor: option.color,
+                            radius: 12,
+                          ),
                           title: Text('بقرة #${option.id}'),
                           onTap: () {
                             onSelected(option);
@@ -402,12 +524,18 @@ class _AddNoteFormState extends ConsumerState<_AddNoteForm> {
             },
           ),
           const SizedBox(height: 16),
-          
+
           // Start Date Picker
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.date_range, color: Theme.of(context).colorScheme.primary),
-            title: const Text('تاريخ بدء العداد', style: TextStyle(fontWeight: FontWeight.bold)),
+            leading: Icon(
+              Icons.date_range,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            title: const Text(
+              'تاريخ بدء العداد',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             subtitle: Text(DateFormat('yyyy-MM-dd').format(_startDate)),
             trailing: const Icon(Icons.edit, size: 20),
             onTap: _pickStartDate,
@@ -424,14 +552,19 @@ class _AddNoteFormState extends ConsumerState<_AddNoteForm> {
             decoration: InputDecoration(
               labelText: 'تفاصيل الملاحظة',
               alignLabelWithHint: true,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Reminder Toggle
           SwitchListTile(
-            title: const Text('تعيين منبه تذكيري', style: TextStyle(fontWeight: FontWeight.bold)),
+            title: const Text(
+              'تعيين منبه تذكيري',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             value: _hasReminder,
             activeThumbColor: Theme.of(context).colorScheme.primary,
             onChanged: (val) {
@@ -440,7 +573,7 @@ class _AddNoteFormState extends ConsumerState<_AddNoteForm> {
               });
             },
           ),
-          
+
           if (_hasReminder) ...[
             Row(
               children: [
@@ -450,7 +583,9 @@ class _AddNoteFormState extends ConsumerState<_AddNoteForm> {
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
                       labelText: 'بعد كم يوم؟',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       suffixText: 'أيام',
                     ),
                   ),
@@ -462,7 +597,9 @@ class _AddNoteFormState extends ConsumerState<_AddNoteForm> {
                     child: InputDecorator(
                       decoration: InputDecoration(
                         labelText: 'الساعة',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: Text(_selectedTime.format(context)),
                     ),
@@ -471,7 +608,7 @@ class _AddNoteFormState extends ConsumerState<_AddNoteForm> {
               ],
             ),
           ],
-          
+
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: _saveNote,
@@ -479,9 +616,14 @@ class _AddNoteFormState extends ConsumerState<_AddNoteForm> {
               padding: const EdgeInsets.symmetric(vertical: 16),
               backgroundColor: Theme.of(context).colorScheme.primary,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            child: const Text('حفظ الملاحظة', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            child: const Text(
+              'حفظ الملاحظة',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),

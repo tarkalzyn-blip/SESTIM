@@ -6,6 +6,7 @@ import 'package:cow_pregnancy/providers/auth_provider.dart';
 import 'package:cow_pregnancy/providers/cow_provider.dart';
 import 'package:cow_pregnancy/providers/alerts_provider.dart';
 import 'package:cow_pregnancy/services/notification_service.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -70,10 +71,10 @@ class SettingsScreen extends ConsumerWidget {
   Widget _buildProfileCard(BuildContext context, dynamic appUser) {
     return Card(
       elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.1)),
+        side: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.1)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -107,7 +108,7 @@ class SettingsScreen extends ConsumerWidget {
         onTap: onTap,
         leading: Container(
           padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
           child: Icon(icon, color: color),
         ),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
@@ -222,13 +223,27 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
   late TextEditingController _preg;
   late TextEditingController _rec;
   late TextEditingController _heat;
+  late TextEditingController _late;
+  late TextEditingController _dry;
 
   @override
   void initState() {
     super.initState();
     _preg = TextEditingController(text: AppSettings.pregnancyDays.toString());
     _rec = TextEditingController(text: AppSettings.recoveryDays.toString());
+    _late = TextEditingController(text: AppSettings.lateInseminationDays.toString());
+    _dry = TextEditingController(text: AppSettings.dryingDays.toString());
     _heat = TextEditingController(text: AppSettings.heatCycleDays.toString());
+  }
+
+  @override
+  void dispose() {
+    _preg.dispose();
+    _rec.dispose();
+    _late.dispose();
+    _dry.dispose();
+    _heat.dispose();
+    super.dispose();
   }
 
   @override
@@ -239,16 +254,22 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
         padding: const EdgeInsets.all(16),
         children: [
           _buildInput('مدة الحمل (يوم)', _preg, Icons.calendar_month),
-          _buildInput('فترة التعافي (يوم)', _rec, Icons.child_care),
+          _buildInput('بداية الجاهزية للتلقيح (يوم)', _rec, Icons.child_care),
+          _buildInput('تأخر في التلقيح (يوم)', _late, Icons.warning_amber),
+          _buildInput('بداية فترة التجفيف قبل الولادة (يوم)', _dry, Icons.dry_cleaning),
           _buildInput('دورة الشبق (يوم)', _heat, Icons.loop),
           const SizedBox(height: 32),
           FilledButton(
             onPressed: () async {
               await AppSettings.setPregnancyDays(int.tryParse(_preg.text) ?? 280);
-              await AppSettings.setRecoveryDays(int.tryParse(_rec.text) ?? 65);
+              await AppSettings.setRecoveryDays(int.tryParse(_rec.text) ?? 60);
+              await AppSettings.setLateInseminationDays(int.tryParse(_late.text) ?? 70);
+              await AppSettings.setDryingDays(int.tryParse(_dry.text) ?? 60);
               await AppSettings.setHeatCycleDays(int.tryParse(_heat.text) ?? 21);
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الحفظ')));
+                ref.invalidate(cowProvider);
+                ref.invalidate(alertsProvider);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الحفظ بنجاح')));
                 Navigator.pop(context);
               }
             },
@@ -286,6 +307,7 @@ class _SystemSettingsPageState extends ConsumerState<SystemSettingsPage> {
   late int _hour;
   late int _minute;
   late bool _exact;
+  late AudioPlayer _previewPlayer;
 
   @override
   void initState() {
@@ -293,6 +315,15 @@ class _SystemSettingsPageState extends ConsumerState<SystemSettingsPage> {
     _hour = AppSettings.notificationHour;
     _minute = AppSettings.notificationMinute;
     _exact = AppSettings.exactSearchMatch;
+    _previewPlayer = AudioPlayer();
+    _previewPlayer.setPlayerMode(PlayerMode.lowLatency);
+    _previewPlayer.setReleaseMode(ReleaseMode.stop);
+  }
+
+  @override
+  void dispose() {
+    _previewPlayer.dispose();
+    super.dispose();
   }
 
   String _formatTimeDisplay(int hour, int minute) {
@@ -316,7 +347,7 @@ class _SystemSettingsPageState extends ConsumerState<SystemSettingsPage> {
             trailing: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
+                color: Colors.blue.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -359,19 +390,72 @@ class _SystemSettingsPageState extends ConsumerState<SystemSettingsPage> {
           ),
           ListTile(
             title: const Text('نغمة التنبيه', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('تغيير صوت الإشعار أو تفعيل الاهتزاز'),
+            subtitle: const Text('اختر نغمة الإشعارات المفضلة لديك'),
             leading: const Icon(Icons.music_note, color: Colors.blue),
-            trailing: const Icon(Icons.settings, size: 20),
-            onTap: () {
-              // هذا الكود سيفتح إعدادات الإشعارات الخاصة بالتطبيق في أندرويد
-              // لكي يختار المستخدم النغمة التي يفضلها من النظام
-              NotificationService().openNotificationSettings();
-            },
+            trailing: DropdownButton<String>(
+              value: AppSettings.notificationSound,
+              underline: const SizedBox(),
+              icon: const Icon(Icons.keyboard_arrow_left),
+              items: const [
+                DropdownMenuItem(value: 'default_sound', child: Text('النغمة الافتراضية')),
+                DropdownMenuItem(value: 'farm_tone', child: Text('نغمة المزرعة')),
+                DropdownMenuItem(value: 'nature_birds', child: Text('أصوات الطبيعة')),
+                DropdownMenuItem(value: 'modern_alert', child: Text('تنبيه عصري')),
+                DropdownMenuItem(value: 'soft_chime', child: Text('جرس ناعم')),
+                DropdownMenuItem(value: 'classic_bell', child: Text('جرس كلاسيك')),
+              ],
+              onChanged: (val) async {
+                if (val != null) {
+                  await AppSettings.setNotificationSound(val);
+                  setState(() {});
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('تم تحديث نغمة التنبيه للمهمات القادمة'))
+                    );
+                  }
+                }
+              },
+            ),
+          ),
+          ListTile(
+            title: const Text('نغمة عجلة التاريخ', style: TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: const Text('اختر نغمة الحركة عند تغيير التاريخ'),
+            leading: const Icon(Icons.slow_motion_video, color: Colors.blue),
+            trailing: DropdownButton<String>(
+              value: AppSettings.datePickerSound,
+              underline: const SizedBox(),
+              icon: const Icon(Icons.keyboard_arrow_left),
+              items: const [
+                DropdownMenuItem(value: 'tick.mp3', child: Text('النغمة الأصلية')),
+                DropdownMenuItem(value: 'tick_1.mp3', child: Text('النغمة 1')),
+                DropdownMenuItem(value: 'tick_2.mp3', child: Text('النغمة 2')),
+                DropdownMenuItem(value: 'tick_3.mp3', child: Text('النغمة 3')),
+              ],
+              onChanged: (val) async {
+                if (val != null) {
+                  await AppSettings.setDatePickerSound(val);
+                  setState(() {});
+                  // Preview sound safely
+                  try {
+                    await _previewPlayer.stop();
+                    await _previewPlayer.play(AssetSource('sounds/$val'));
+                  } catch (e) {
+                    debugPrint('Preview sound error: $e');
+                  }
+                }
+              },
+            ),
+          ),
+          ListTile(
+            title: const Text('إعدادات النظام للإشعارات', style: TextStyle(fontSize: 13)),
+            subtitle: const Text('فتح إعدادات أندرويد للتحكم المتقدم'),
+            leading: const Icon(Icons.settings_applications, color: Colors.grey, size: 20),
+            onTap: () => NotificationService().openNotificationSettings(),
           ),
           const Divider(),
           SwitchListTile(
             title: const Text('البحث الدقيق برقم البقرة', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('يتطلب كتابة الرقم كاملاً للعثور على البقرة'),
+            subtitle: const Text('يتطلب كتابة الرقم كامل للعثور على البقرة'),
             secondary: const Icon(Icons.search, color: Colors.blue),
             value: _exact,
             onChanged: (val) {

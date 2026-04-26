@@ -124,23 +124,38 @@ class NotificationService {
     required String title,
     required String body,
     required DateTime scheduledDate,
+    String channelId = 'cow_pregnancy_channel',
+    String channelName = 'تنبيهات الحمل',
   }) async {
     try {
       if (scheduledDate.isBefore(DateTime.now())) return;
+
+      final selectedSound = AppSettings.notificationSound;
+      final isDefault = selectedSound == 'default_sound';
+      
+      // We change channel ID when sound changes so Android creates a new channel with the new sound
+      final finalChannelId = isDefault ? channelId : '${channelId}_$selectedSound';
+      final RawResourceAndroidNotificationSound? androidSound = isDefault 
+          ? null 
+          : RawResourceAndroidNotificationSound(selectedSound);
 
       await _notificationsPlugin.zonedSchedule(
         id: id,
         title: title,
         body: body,
         scheduledDate: tz.TZDateTime.from(scheduledDate, tz.local),
-        notificationDetails: const NotificationDetails(
+        notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
-            'cow_pregnancy_channel',
-            'تنبيهات الحمل',
-            channelDescription: 'إشعارات مواعيد الحمل للأبقار',
+            finalChannelId,
+            channelName,
+            channelDescription: 'تنبيهات هامة للملاحظات والمواعيد',
             importance: Importance.max,
             priority: Priority.high,
-            largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+            playSound: true,
+            sound: androidSound,
+            enableVibration: true,
+            fullScreenIntent: true,
+            largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -161,6 +176,8 @@ class NotificationService {
       title: title,
       body: body,
       scheduledDate: scheduledDate,
+      channelId: 'notes_reminders_channel',
+      channelName: 'تنبيهات الملاحظات والمهمات',
     );
   }
 

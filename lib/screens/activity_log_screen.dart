@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cow_pregnancy/providers/cow_provider.dart';
 import 'package:cow_pregnancy/screens/settings_screen.dart';
 import 'package:intl/intl.dart';
+import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
+import 'package:cow_pregnancy/models/cow_model.dart';
 
 class ActivityLogScreen extends ConsumerStatefulWidget {
   const ActivityLogScreen({super.key});
@@ -94,10 +96,10 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> with Sing
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildSalesList(sales, isDark),
-          _buildBirthsList(births, isDark),
-          _buildDeathsList(deaths, isDark),
-          _buildInseminationsList(inseminations, isDark),
+          _buildSalesList(sales, isDark, cows),
+          _buildBirthsList(births, isDark, cows),
+          _buildDeathsList(deaths, isDark, cows),
+          _buildInseminationsList(inseminations, isDark, cows),
         ],
       ),
     );
@@ -112,39 +114,39 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> with Sing
     );
   }
 
-  Widget _buildSalesList(List<Map<String, dynamic>> items, bool isDark) {
+  Widget _buildSalesList(List<Map<String, dynamic>> items, bool isDark, List<Cow> cows) {
     if (items.isEmpty) return _emptyState('لا توجد مبيعات مسجلة');
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: items.length,
-      itemBuilder: (ctx, i) => _buildLogCard(items[i], LogType.sale, isDark),
+      itemBuilder: (ctx, i) => _buildLogCard(items[i], LogType.sale, isDark, cows),
     );
   }
 
-  Widget _buildBirthsList(List<Map<String, dynamic>> items, bool isDark) {
+  Widget _buildBirthsList(List<Map<String, dynamic>> items, bool isDark, List<Cow> cows) {
     if (items.isEmpty) return _emptyState('لا توجد ولادات مسجلة');
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: items.length,
-      itemBuilder: (ctx, i) => _buildLogCard(items[i], LogType.birth, isDark),
+      itemBuilder: (ctx, i) => _buildLogCard(items[i], LogType.birth, isDark, cows),
     );
   }
 
-  Widget _buildDeathsList(List<Map<String, dynamic>> items, bool isDark) {
+  Widget _buildDeathsList(List<Map<String, dynamic>> items, bool isDark, List<Cow> cows) {
     if (items.isEmpty) return _emptyState('لا توجد وفيات مسجلة');
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: items.length,
-      itemBuilder: (ctx, i) => _buildLogCard(items[i], LogType.death, isDark),
+      itemBuilder: (ctx, i) => _buildLogCard(items[i], LogType.death, isDark, cows),
     );
   }
 
-  Widget _buildInseminationsList(List<Map<String, dynamic>> items, bool isDark) {
+  Widget _buildInseminationsList(List<Map<String, dynamic>> items, bool isDark, List<Cow> cows) {
     if (items.isEmpty) return _emptyState('لا توجد تلقيحات مسجلة');
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: items.length,
-      itemBuilder: (ctx, i) => _buildLogCard(items[i], LogType.insemination, isDark),
+      itemBuilder: (ctx, i) => _buildLogCard(items[i], LogType.insemination, isDark, cows),
     );
   }
 
@@ -190,37 +192,40 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> with Sing
     );
   }
 
-  Widget _buildLogCard(Map<String, dynamic> item, LogType type, bool isDark) {
+  Widget _buildLogCard(Map<String, dynamic> item, LogType type, bool isDark, List<Cow> cows) {
     final date = DateTime.parse(item[type == LogType.sale || type == LogType.death ? 'exitDate' : 'date']);
     final birthDate = DateTime.parse(item['date']);
     final ageDays = type == LogType.sale || type == LogType.death 
         ? date.difference(birthDate).inDays 
         : 0;
 
-    String title = '';
-    IconData icon = Icons.info;
-    Color color = Colors.blue;
+    String titleText = '';
+    String? idToShow;
+    Color idColor = Colors.blueGrey;
 
     switch (type) {
       case LogType.sale:
-        title = 'بيع عجل رقم ${item['calfId'] ?? 'غير معروف'}';
-        icon = Icons.attach_money;
-        color = Colors.green;
+        titleText = 'بيع';
+        idToShow = item['calfId']?.toString();
+        idColor = Color(item['calfColorValue'] ?? Colors.green.toARGB32());
         break;
       case LogType.birth:
-        title = 'ولادة عجل رقم ${item['calfId'] ?? 'غير معروف'}';
-        icon = Icons.child_friendly;
-        color = Colors.blue;
+        titleText = 'ولادة';
+        idToShow = item['calfId']?.toString();
+        idColor = Color(item['calfColorValue'] ?? Colors.blue.toARGB32());
         break;
       case LogType.death:
-        title = 'وفاة عجل رقم ${item['calfId'] ?? 'غير معروف'}';
-        icon = Icons.priority_high;
-        color = Colors.red;
+        titleText = 'وفاة';
+        idToShow = item['calfId']?.toString();
+        idColor = Color(item['calfColorValue'] ?? Colors.red.toARGB32());
         break;
       case LogType.insemination:
-        title = 'تلقيح البقرة ${item['cowId']}';
-        icon = Icons.science;
-        color = Colors.purple;
+        titleText = 'تلقيح';
+        idToShow = item['cowId']?.toString();
+        // Find cow color
+        try {
+          idColor = cows.firstWhere((c) => c.id == idToShow).color;
+        } catch (_) {}
         break;
     }
 
@@ -232,10 +237,29 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> with Sing
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Container(
           padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
-          child: Icon(icon, color: color),
+          decoration: BoxDecoration(
+            color: (type == LogType.sale ? Colors.green : type == LogType.death ? Colors.red : type == LogType.insemination ? Colors.purple : Colors.blue).withValues(alpha: 0.1), 
+            shape: BoxShape.circle
+          ),
+          child: Icon(
+            type == LogType.sale ? Icons.attach_money : type == LogType.death ? Icons.priority_high : type == LogType.insemination ? Icons.science : Icons.child_friendly, 
+            color: (type == LogType.sale ? Colors.green : type == LogType.death ? Colors.red : type == LogType.insemination ? Colors.purple : Colors.blue)
+          ),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Row(
+          children: [
+            Text(titleText, style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(width: 8),
+            if (idToShow != null)
+              CowIdBadge(
+                id: idToShow,
+                color: idColor,
+                fontSize: 12,
+                boxSize: 12,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              ),
+          ],
+        ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -251,7 +275,18 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> with Sing
                 Text('الملاحظات: ${item['note']}', style: const TextStyle(fontSize: 11)),
             ],
             if (type == LogType.birth)
-              Text('الأم: ${item['motherId']}', style: const TextStyle(fontSize: 12)),
+              Row(
+                children: [
+                  const Text('الأم: ', style: TextStyle(fontSize: 12)),
+                  CowIdBadge(
+                    id: item['motherId'],
+                    color: cows.firstWhere((c) => c.id == item['motherId'], orElse: () => cows[0]).color,
+                    fontSize: 10,
+                    boxSize: 10,
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  ),
+                ],
+              ),
             if (type == LogType.insemination)
               Text('ملاحظات: ${item['note'] ?? 'لا يوجد'}', style: const TextStyle(fontSize: 12)),
           ],

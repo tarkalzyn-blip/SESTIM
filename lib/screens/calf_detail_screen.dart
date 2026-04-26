@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cow_pregnancy/providers/cow_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:cow_pregnancy/widgets/custom_date_picker.dart';
+import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
 
 class CalfDetailScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> calfData;
@@ -499,14 +500,12 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Text(
-                    _currentCalfData['calfId'] != null
-                        ? 'رقم العجل: ${_currentCalfData['calfId']}'
-                        : 'بدون رقم',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  CowIdBadge(
+                    id: _currentCalfData['calfId']?.toString() ?? 'بدون رقم',
+                    color: calfColor,
+                    fontSize: 24,
+                    boxSize: 24,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   ),
                   Text(
                     isMale ? 'ذكر' : 'أنثى',
@@ -531,7 +530,14 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
             _buildDetailCard(
               Icons.female,
               'رقم الأم',
-              '#${_currentCalfData['motherId']}',
+              '',
+              trailingWidget: CowIdBadge(
+                id: _currentCalfData['motherId'].toString(),
+                color: _currentCalfData['motherColor'] ?? Colors.blueGrey,
+                fontSize: 12,
+                boxSize: 12,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              ),
             ),
 
             if (isExited &&
@@ -691,7 +697,7 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
     );
   }
 
-  Widget _buildDetailCard(IconData icon, String title, String value) {
+  Widget _buildDetailCard(IconData icon, String title, String value, {Widget? trailingWidget}) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -701,7 +707,7 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
           title,
           style: const TextStyle(fontSize: 14, color: Colors.grey),
         ),
-        trailing: Text(
+        trailing: trailingWidget ?? Text(
           value,
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),

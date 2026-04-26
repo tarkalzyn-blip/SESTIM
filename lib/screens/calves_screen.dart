@@ -8,6 +8,7 @@ import 'package:cow_pregnancy/screens/settings_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'package:cow_pregnancy/widgets/custom_date_picker.dart';
+import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
 
 enum CalfSort { newest, oldest }
 
@@ -254,6 +255,78 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
     }).toList();
 
     ref.read(cowProvider.notifier).updateCow(cow.copyWith(history: newHistory));
+  }
+
+  void _showCalfOptions(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> calf,
+  ) {
+    final calfId = calf['calfId'];
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'خيارات المولود #${calfId ?? "بدون رقم"}',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          const SizedBox(height: 12),
+          ListTile(
+            leading: const Icon(Icons.edit_outlined, color: Colors.blue),
+            title: const Text(
+              'تعديل البيانات',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            onTap: () {
+              Navigator.pop(ctx);
+              _editCalf(
+                context,
+                ref,
+                calf['motherUniqueKey'],
+                calf['eventId'],
+                calf['originalEventDate'],
+                calfId,
+                calf['calfColorValue'],
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.delete_outline, color: Colors.red),
+            title: const Text(
+              'حذف السجل',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            ),
+            onTap: () {
+              Navigator.pop(ctx);
+              _deleteCalf(
+                context,
+                ref,
+                calf['motherUniqueKey'],
+                calf['eventId'],
+                calf['originalEventDate'],
+                calfId,
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
   }
 
   void _moveToHerd(
@@ -605,15 +678,7 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                                 // Refresh UI if state changed
                                 setState(() {});
                               },
-                              onLongPress: () => _editCalf(
-                                context,
-                                ref,
-                                calf['motherUniqueKey'],
-                                calf['eventId'],
-                                calf['originalEventDate'],
-                                calfId,
-                                calf['calfColorValue'],
-                              ),
+                              onLongPress: () => _showCalfOptions(context, ref, calf),
                               borderRadius: BorderRadius.circular(15),
                               child: Stack(
                                 children: [
@@ -626,34 +691,12 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.center,
                                       children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(10),
-                                          decoration: BoxDecoration(
-                                            color: calf['isExited'] == true
-                                                ? Colors.grey.withValues(
-                                                    alpha: 0.2,
-                                                  )
-                                                : calfColor.withValues(
-                                                    alpha: 0.15,
-                                                  ),
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: calf['isExited'] == true
-                                                  ? Colors.grey
-                                                  : calfColor,
-                                              width: 2,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            calfId?.toString() ?? '?',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 18,
-                                              color: calf['isExited'] == true
-                                                  ? Colors.grey
-                                                  : calfColor,
-                                            ),
-                                          ),
+                                        CowIdBadge(
+                                          id: calfId?.toString() ?? '?',
+                                          color: calfColor,
+                                          fontSize: 16,
+                                          boxSize: 18,
+                                          padding: const EdgeInsets.all(8),
                                         ),
                                         const SizedBox(width: 12),
                                         Expanded(
@@ -746,53 +789,16 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                                                       fontSize: 12,
                                                     ),
                                                   ),
-                                                  Container(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 6,
-                                                          vertical: 2,
-                                                        ),
-                                                    decoration: BoxDecoration(
-                                                      color: calf['motherColor']
-                                                          .withValues(
-                                                            alpha: 0.2,
-                                                          ),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            4,
-                                                          ),
-                                                    ),
-                                                    child: Text(
-                                                      '#${calf['motherId']}',
-                                                      style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        color:
-                                                            calf['motherColor'],
-                                                        fontSize: 12,
-                                                      ),
-                                                    ),
+                                                  CowIdBadge(
+                                                    id: calf['motherId'].toString(),
+                                                    color: calf['motherColor'],
+                                                    fontSize: 12,
+                                                    boxSize: 12,
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                   ),
                                                 ],
                                               ),
                                             ],
-                                          ),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(
-                                            Icons.edit_outlined,
-                                            size: 20,
-                                            color: Colors.blueGrey,
-                                          ),
-                                          tooltip: 'تعديل',
-                                          onPressed: () => _editCalf(
-                                            context,
-                                            ref,
-                                            calf['motherUniqueKey'],
-                                            calf['eventId'],
-                                            calf['originalEventDate'],
-                                            calfId,
-                                            calf['calfColorValue'],
                                           ),
                                         ),
                                         // Insemination Move Button for Heifers >= 1 Year
@@ -810,22 +816,6 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                                             onPressed: () =>
                                                 _moveToHerd(context, ref, calf),
                                           ),
-                                        IconButton(
-                                          icon: const Icon(
-                                            Icons.delete_outline,
-                                            size: 20,
-                                            color: Colors.redAccent,
-                                          ),
-                                          tooltip: 'حذف',
-                                          onPressed: () => _deleteCalf(
-                                            context,
-                                            ref,
-                                            calf['motherUniqueKey'],
-                                            calf['eventId'],
-                                            calf['originalEventDate'],
-                                            calfId,
-                                          ),
-                                        ),
                                       ],
                                     ),
                                   ),

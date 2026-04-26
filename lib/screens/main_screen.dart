@@ -2,6 +2,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:cow_pregnancy/providers/alerts_provider.dart';
 import 'package:cow_pregnancy/screens/summary_screen.dart';
 import 'package:cow_pregnancy/screens/cows_list_screen.dart';
 import 'package:cow_pregnancy/screens/calves_screen.dart';
@@ -19,6 +21,151 @@ class MainScreen extends ConsumerStatefulWidget {
 class _MainScreenState extends ConsumerState<MainScreen> {
   int _selectedIndex = 0;
   Widget _moreScreen = const ReportsScreen(); // Default to reports
+  bool _isDialogShowing = false;
+
+  void _checkAndShowNewAlerts(List<SmartAlert> alerts) async {
+    if (alerts.isEmpty || _isDialogShowing) return;
+    
+    final box = Hive.box('settings');
+    final List<String> seenAlerts = List<String>.from(box.get('seen_alerts', defaultValue: []));
+    
+    final newAlerts = alerts.where((alert) => !seenAlerts.contains(alert.id)).toList();
+    
+    if (newAlerts.isNotEmpty) {
+      _isDialogShowing = true;
+      // Mark as seen immediately to prevent double triggers
+      seenAlerts.addAll(newAlerts.map((a) => a.id));
+      await box.put('seen_alerts', seenAlerts);
+      
+      if (!mounted) return;
+      
+      showGeneralDialog(
+        context: context,
+        barrierDismissible: false, // Force them to click OK
+        barrierLabel: 'New Alerts',
+        barrierColor: Colors.black.withOpacity(0.5),
+        transitionDuration: const Duration(milliseconds: 300),
+        pageBuilder: (context, anim1, anim2) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                const Icon(Icons.notifications_active, color: Colors.orange, size: 28),
+                const SizedBox(width: 10),
+                const Text('تنبيهات جديدة!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              ],
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.5),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: newAlerts.length,
+                  separatorBuilder: (context, index) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final alert = newAlerts[index];
+                    final color = Color(alert.cowColorValue);
+                    
+                    // Dynamically remove "البقرة #123 " from description if present
+                    String cleanDescription = alert.description;
+                    String prefixToRemove = 'البقرة #${alert.cowId} ';
+                    if (cleanDescription.startsWith(prefixToRemove)) {
+                      cleanDescription = cleanDescription.substring(prefixToRemove.length);
+                    }
+                    
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(alert.title, style: const TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                          const SizedBox(height: 10),
+                          RichText(
+                            text: TextSpan(
+                              style: TextStyle(
+                                fontSize: 14, 
+                                height: 1.6,
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontFamily: Theme.of(context).textTheme.bodyMedium?.fontFamily,
+                              ),
+                              children: [
+                                WidgetSpan(
+                                  alignment: PlaceholderAlignment.middle,
+                                  child: Container(
+                                    margin: const EdgeInsets.only(left: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: color.withValues(alpha: 0.1),
+                                      border: Border.all(color: color.withValues(alpha: 0.4)),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 10,
+                                          height: 10,
+                                          decoration: BoxDecoration(
+                                            color: color,
+                                            borderRadius: BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          alert.cowId,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                            color: Theme.of(context).colorScheme.onSurface,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                TextSpan(text: cleanDescription),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                ),
+              ),
+            ),
+            actions: [
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _isDialogShowing = false;
+                },
+                child: const Text('فهمت', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              )
+            ],
+          );
+        },
+        transitionBuilder: (context, anim1, anim2, child) {
+          return ScaleTransition(
+            scale: CurvedAnimation(parent: anim1, curve: Curves.easeOutBack),
+            child: child,
+          );
+        },
+      ).then((_) => _isDialogShowing = false);
+    }
+  }
 
   List<Widget> get _screens => [
     const SummaryScreen(),
@@ -118,10 +265,22 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<List<SmartAlert>>(alertsProvider, (previous, next) {
+      _checkAndShowNewAlerts(next);
+    });
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
+        
+        // If not on the dashboard, go back to it
+        if (_selectedIndex != 0) {
+          setState(() {
+            _selectedIndex = 0;
+          });
+          return;
+        }
         
         final now = DateTime.now();
         if (_lastPressedAt == null || now.difference(_lastPressedAt!) > const Duration(seconds: 2)) {

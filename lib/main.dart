@@ -26,6 +26,7 @@ void main() async {
   await Hive.initFlutter();
   Hive.registerAdapter(CowAdapter());
   await Hive.openBox<Cow>('cows');
+  await Hive.openBox('notes_box'); // New box for notes
   await Hive.openBox('settings');
 
   // Initialize Notifications

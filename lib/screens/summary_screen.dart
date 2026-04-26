@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cow_pregnancy/providers/cow_provider.dart';
+import 'package:cow_pregnancy/utils/app_settings.dart';
 import 'package:cow_pregnancy/providers/alerts_provider.dart';
 import 'package:cow_pregnancy/widgets/stat_card.dart';
 import 'package:cow_pregnancy/models/cow_model.dart';
@@ -8,6 +9,7 @@ import 'package:cow_pregnancy/screens/settings_screen.dart';
 import 'package:cow_pregnancy/screens/cow_detail_screen.dart';
 import 'package:cow_pregnancy/services/notification_service.dart';
 import 'package:cow_pregnancy/providers/theme_provider.dart';
+import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
 
 class SummaryScreen extends ConsumerWidget {
   const SummaryScreen({super.key});
@@ -27,15 +29,65 @@ class SummaryScreen extends ConsumerWidget {
     });
 
     final int totalCows = cows.length;
-    final int pregnantCount = cows.where((c) => c.isInseminated && !c.isPostBirth && c.daysSinceInsemination > 25).length;
-    final int postBirthCount = cows.where((c) => c.isPostBirth).length;
+    
+    // Breeding Status
+    int breedingReady = 0; // 🟢 جاهزة للتلقيح
+    int breedingMonitoring = 0; // 🟡 تحت الفحص
+    int breedingPregnant = 0; // 🔵 حوامل
+    int breedingLate = 0; // 🔴 تأخر بالتلقيح
+    int breedingEmpty = 0; // ⚪ غير مخصبة (فارغة)
+
+    // Production Stages
+    int prodMilking = 0; // 🥛 حلوب
+    int prodDrying = 0; // 💤 فترة التجفيف
+    int prodHeifer = 0; // 🐄 بكيرة
     
     // Calf counting logic
     int totalCalves = 0;
     int maleCalves = 0;
     int femaleCalves = 0;
-    
+
+    final int pregnancyDays = AppSettings.pregnancyDays;
+    final int recoveryDays = AppSettings.recoveryDays;
+    final int lateInsemDays = AppSettings.lateInseminationDays;
+    final int dryingDays = AppSettings.dryingDays;
+
     for (var cow in cows) {
+      bool hasBirthHistory = cow.history.any((e) => e['title'] == 'تسجيل ولادة' || e['title'] == 'تسجيل ولادة سابقة') || cow.isPostBirth;
+      
+      // --- حالات التكاثر ---
+      if (cow.isInseminated && !cow.isPostBirth) {
+        if (cow.daysSinceInsemination <= 40) {
+          breedingMonitoring++;
+        } else {
+          breedingPregnant++;
+        }
+      } else if (cow.isPostBirth) {
+        if (cow.daysSinceBirth > lateInsemDays) {
+          breedingLate++;
+        } else if (cow.daysSinceBirth >= recoveryDays) {
+          breedingReady++;
+        } else {
+          breedingEmpty++;
+        }
+      } else {
+        if (!hasBirthHistory) {
+          breedingReady++;
+        } else {
+          breedingEmpty++;
+        }
+      }
+
+      // --- مراحل الإنتاج ---
+      if (!hasBirthHistory) {
+        prodHeifer++;
+      } else if (cow.isInseminated && (pregnancyDays - cow.daysSinceInsemination) <= dryingDays) {
+        prodDrying++;
+      } else {
+        prodMilking++;
+      }
+
+      // --- العجول ---
       for (var event in cow.history) {
         final title = event['title']?.toString() ?? '';
         if (title == 'تسجيل ولادة' || title == 'تسجيل ولادة سابقة') {
@@ -90,24 +142,49 @@ class SummaryScreen extends ConsumerWidget {
                   ],
                 ),
               ),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                 color: Colors.blue.withValues(alpha: 0.1),
+                 borderRadius: BorderRadius.circular(20),
+                 border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                 children: [
+                   const Text('إجمالي القطيع', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue)),
+                   const SizedBox(height: 5),
+                   Text('$totalCows بقرة', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.blue)),
+                 ]
+              )
+            ),
+            const SizedBox(height: 30),
+            
             const Text(
-              'نظرة عامة',
+              'حالات التكاثر',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blueGrey),
             ),
-            const SizedBox(height: 20),
-            GridView.count(
-              shrinkWrap: true,
-              crossAxisCount: 3,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 1.0,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                StatCard(title: 'إجمالي القطيع', count: totalCows, color: Colors.blue, delayMs: 0),
-                StatCard(title: 'حوامل', count: pregnantCount, color: Colors.green, delayMs: 100),
-                StatCard(title: 'بعد الولادة', count: postBirthCount, color: Colors.teal, delayMs: 200),
-              ],
+            const SizedBox(height: 16),
+            _buildStatusGrid(context, [
+              _StatusItemData('جاهزة للتلقيح', breedingReady, Colors.green, '🟢'),
+              _StatusItemData('تحت الفحص', breedingMonitoring, Colors.amber, '🟡'),
+              _StatusItemData('حوامل', breedingPregnant, Colors.blue, '🔵'),
+              _StatusItemData('تأخر بالتلقيح', breedingLate, Colors.red, '🔴'),
+              _StatusItemData('فارغة', breedingEmpty, Colors.grey, '⚪'),
+            ]),
+            
+            const SizedBox(height: 30),
+            
+            const Text(
+              'مراحل الإنتاج',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blueGrey),
             ),
+            const SizedBox(height: 16),
+            _buildStatusGrid(context, [
+              _StatusItemData('حلوب', prodMilking, Colors.blueAccent, '🥛'),
+              _StatusItemData('فترة التجفيف', prodDrying, Colors.indigo, '💤'),
+              _StatusItemData('بكيرة', prodHeifer, Colors.orange, '🐄'),
+            ]),
             
             const SizedBox(height: 30),
             Row(
@@ -268,56 +345,26 @@ class SummaryScreen extends ConsumerWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              alert.title,
+                              alert.title.replaceAll('البقرة رقم', '').replaceAll('البقرة', '').trim(),
                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: cardColor),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           const SizedBox(width: 8),
-                          // Badge رقم البقرة بلون كرتها
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: cowColor,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: cowColor.withValues(alpha: 0.4),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.circle, size: 8, color: Colors.white),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '#${alert.cowId}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
+                          // Badge رقم البقرة بلون كرتها - النظام الجديد
+                          CowIdBadge(
+                            id: alert.cowId,
+                            color: cowColor,
+                            fontSize: 14,
+                            boxSize: 15,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                           ),
-                          if (alert.severity == AlertSeverity.high) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)),
-                              child: const Text('عاجل', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                            ),
-                          ],
                         ],
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        alert.description,
+                        alert.description.replaceAll('البقرة رقم', '').replaceAll('البقرة', '').replaceAll('#${alert.cowId}', '').trim(),
                         style: const TextStyle(fontSize: 14),
                       ),
                       const SizedBox(height: 8),
@@ -366,4 +413,72 @@ class SummaryScreen extends ConsumerWidget {
       ],
     );
   }
+  Widget _buildStatusGrid(BuildContext context, List<_StatusItemData> items) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: items.map((item) {
+        final isFiveItems = items.length == 5;
+        final isThreeItems = items.length == 3;
+        final isLastItem = item == items.last;
+        // Make the last item full width if it's the odd one out (5 or 3 items)
+        double width = (MediaQuery.of(context).size.width - 40 - 12) / 2;
+        if ((isFiveItems || isThreeItems) && isLastItem) {
+          width = MediaQuery.of(context).size.width - 40;
+        }
+
+        return Container(
+          width: width,
+          decoration: BoxDecoration(
+            color: item.color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: item.color.withValues(alpha: 0.3), width: 1.5),
+            boxShadow: [
+              BoxShadow(color: item.color.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(item.emoji, style: const TextStyle(fontSize: 24)),
+                  const SizedBox(width: 8),
+                  Text(
+                    item.count.toString(),
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      color: item.color,
+                      height: 1,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                item.title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _StatusItemData {
+  final String title;
+  final int count;
+  final Color color;
+  final String emoji;
+  _StatusItemData(this.title, this.count, this.color, this.emoji);
 }

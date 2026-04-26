@@ -53,6 +53,7 @@ dependencies:
   cloud_firestore: ^6.3.0
   connectivity_plus: ^6.1.4
   app_settings: ^6.1.1
+  audioplayers: ^6.1.0
 
 dev_dependencies:
   flutter_test:
@@ -85,9 +86,11 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  assets:
+    - assets/sounds/tick.mp3
+    - assets/sounds/tick_1.mp3
+    - assets/sounds/tick_2.mp3
+    - assets/sounds/tick_3.mp3
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

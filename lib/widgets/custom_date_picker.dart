@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cow_pregnancy/utils/date_picker_utils.dart';
 
 class CustomDatePickerField extends StatefulWidget {
   final String label;
@@ -28,7 +29,9 @@ class _CustomDatePickerFieldState extends State<CustomDatePickerField> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: _formatter.format(widget.initialDate));
+    _controller = TextEditingController(
+      text: _formatter.format(widget.initialDate),
+    );
   }
 
   @override
@@ -67,11 +70,12 @@ class _CustomDatePickerFieldState extends State<CustomDatePickerField> {
         suffixIcon: IconButton(
           icon: const Icon(Icons.date_range),
           onPressed: () async {
-            final pickedDate = await showDatePicker(
+            final pickedDate = await showCustomDatePicker(
               context: context,
-              initialDate: widget.initialDate,
+              initialDate: DateTime.now(),
               firstDate: widget.firstDate ?? DateTime(2010),
-              lastDate: widget.lastDate ?? DateTime.now(),
+              lastDate: widget.lastDate ?? DateTime(2100),
+              title: widget.label,
             );
             if (pickedDate != null) {
               setState(() {

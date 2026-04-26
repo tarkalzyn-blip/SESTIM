@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cow_pregnancy/utils/date_picker_utils.dart';
 import 'package:cow_pregnancy/widgets/custom_date_picker.dart';
 import 'package:cow_pregnancy/models/cow_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cow_pregnancy/providers/cow_provider.dart';
 import 'package:cow_pregnancy/screens/add_edit_cow_screen.dart';
 import 'package:cow_pregnancy/utils/app_settings.dart';
+import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
 
 class CowDetailScreen extends ConsumerWidget {
   final Cow cow;
@@ -85,9 +87,12 @@ class CowDetailScreen extends ConsumerWidget {
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                'بقرة #${currentCow.id}',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+              title: CowIdBadge(
+                id: currentCow.id,
+                color: Colors.white,
+                fontSize: 16,
+                boxSize: 14,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               ),
               background: Hero(
                 tag: 'cow_card_${currentCow.uniqueKey}',
@@ -112,6 +117,10 @@ class CowDetailScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // صندوق المتبقي / منذ الولادة (نفس التصميم في الكرت)
+                  _buildMainRemainingBox(context, currentCow),
+                  const SizedBox(height: 24),
+
                   if (currentCow.isPostBirth) ...[
                     _buildDetailRow(
                       'تاريخ الولادة',
@@ -148,6 +157,55 @@ class CowDetailScreen extends ConsumerWidget {
                       subTextColor: subTextColor,
                       textColor: textColor,
                     ),
+
+                    // تنبيه تجاوز موعد الولادة
+                    if (!currentCow.isPostBirth &&
+                        currentCow.isInseminated &&
+                        currentCow.daysSinceInsemination > 280) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.red.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.warning_amber_rounded,
+                              color: Colors.red,
+                              size: 28,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'تنبيه: تجاوز موعد الولادة',
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  Text(
+                                    'تجاوزت البقرة موعد الولادة المفترض بـ ${currentCow.daysSinceInsemination - 280} يوم.',
+                                    style: TextStyle(
+                                      color: Colors.red.withValues(alpha: 0.8),
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                   if (currentCow.bullId != null &&
                       currentCow.bullId!.isNotEmpty) ...[
@@ -181,30 +239,13 @@ class CowDetailScreen extends ConsumerWidget {
                                 color: subTextColor,
                               ),
                             ),
-                            Row(
-                              children: [
-                                Text(
-                                  currentCow.motherId!,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.blueGrey,
-                                  ),
-                                ),
-                                if (currentCow.motherColorValue != null) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    width: 16,
-                                    height: 16,
-                                    decoration: BoxDecoration(
-                                      color: Color(
-                                        currentCow.motherColorValue!,
-                                      ),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                ],
-                              ],
+                            const SizedBox(height: 4),
+                            CowIdBadge(
+                              id: currentCow.motherId!,
+                              color: currentCow.motherColorValue != null
+                                  ? Color(currentCow.motherColorValue!)
+                                  : Colors.blueGrey,
+                              fontSize: 16,
                             ),
                           ],
                         ),
@@ -306,7 +347,13 @@ class CowDetailScreen extends ConsumerWidget {
                     )
                   else
                     ...currentCow.history.reversed.map(
-                      (event) => _buildHistoryItem(event, subTextColor, context, ref, currentCow),
+                      (event) => _buildHistoryItem(
+                        event,
+                        subTextColor,
+                        context,
+                        ref,
+                        currentCow,
+                      ),
                     ),
                 ],
               ),
@@ -317,7 +364,13 @@ class CowDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHistoryItem(dynamic event, Color subTextColor, BuildContext context, WidgetRef ref, Cow currentCow) {
+  Widget _buildHistoryItem(
+    dynamic event,
+    Color subTextColor,
+    BuildContext context,
+    WidgetRef ref,
+    Cow currentCow,
+  ) {
     DateTime date = DateTime.parse(event['date']);
     String title = event['title'] ?? 'حدث';
     String note = event['note'] ?? '';
@@ -346,7 +399,10 @@ class CowDetailScreen extends ConsumerWidget {
                 ),
                 Text(
                   title,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 Text(
                   DateFormat('yyyy-MM-dd').format(date),
@@ -358,7 +414,10 @@ class CowDetailScreen extends ConsumerWidget {
                     backgroundColor: Color(0xFFE3F2FD),
                     child: Icon(Icons.edit_outlined, color: Colors.blue),
                   ),
-                  title: const Text('تعديل السجل', style: TextStyle(fontWeight: FontWeight.bold)),
+                  title: const Text(
+                    'تعديل السجل',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   subtitle: const Text('تعديل الملاحظة أو التاريخ'),
                   onTap: () {
                     Navigator.pop(ctx);
@@ -371,7 +430,13 @@ class CowDetailScreen extends ConsumerWidget {
                     backgroundColor: Color(0xFFFFEBEE),
                     child: Icon(Icons.delete_outline, color: Colors.red),
                   ),
-                  title: const Text('حذف السجل', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                  title: const Text(
+                    'حذف السجل',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   subtitle: const Text('إزالة هذا الحدث من السجل التاريخي'),
                   onTap: () {
                     Navigator.pop(ctx);
@@ -391,9 +456,11 @@ class CowDetailScreen extends ConsumerWidget {
                               final newHistory = currentCow.history
                                   .where((e) => e['eventId'] != eventId)
                                   .toList();
-                              ref.read(cowProvider.notifier).updateCow(
-                                currentCow.copyWith(history: newHistory),
-                              );
+                              ref
+                                  .read(cowProvider.notifier)
+                                  .updateCow(
+                                    currentCow.copyWith(history: newHistory),
+                                  );
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text('تم حذف السجل'),
@@ -401,7 +468,13 @@ class CowDetailScreen extends ConsumerWidget {
                                 ),
                               );
                             },
-                            child: const Text('حذف', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                            child: const Text(
+                              'حذف',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -473,7 +546,12 @@ class CowDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _showEditHistoryDialog(BuildContext context, WidgetRef ref, Cow currentCow, dynamic event) {
+  void _showEditHistoryDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Cow currentCow,
+    dynamic event,
+  ) {
     final noteController = TextEditingController(text: event['note'] ?? '');
     DateTime selectedDate = DateTime.parse(event['date']);
     String eventId = event['eventId'] ?? '';
@@ -482,23 +560,31 @@ class CowDetailScreen extends ConsumerWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setStateDialog) => AlertDialog(
-          title: const Text('تعديل السجل', style: TextStyle(fontWeight: FontWeight.bold)),
+          title: const Text(
+            'تعديل السجل',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(height: 8),
               InkWell(
                 onTap: () async {
-                  final picked = await showDatePicker(
+                  final picked = await showCustomDatePicker(
                     context: context,
                     initialDate: selectedDate,
                     firstDate: DateTime(2000),
                     lastDate: DateTime.now(),
+                    title: 'تعديل التاريخ',
                   );
-                  if (picked != null) setStateDialog(() => selectedDate = picked);
+                  if (picked != null)
+                    setStateDialog(() => selectedDate = picked);
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 14,
+                  ),
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.grey.shade400),
                     borderRadius: BorderRadius.circular(10),
@@ -518,13 +604,18 @@ class CowDetailScreen extends ConsumerWidget {
                 maxLines: 3,
                 decoration: InputDecoration(
                   labelText: 'الملاحظة',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء'),
+            ),
             FilledButton(
               onPressed: () {
                 final newHistory = currentCow.history.map((e) {
@@ -537,12 +628,15 @@ class CowDetailScreen extends ConsumerWidget {
                   }
                   return e;
                 }).toList();
-                ref.read(cowProvider.notifier).updateCow(
-                  currentCow.copyWith(history: newHistory),
-                );
+                ref
+                    .read(cowProvider.notifier)
+                    .updateCow(currentCow.copyWith(history: newHistory));
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('تم تعديل السجل بنجاح'), backgroundColor: Colors.teal),
+                  const SnackBar(
+                    content: Text('تم تعديل السجل بنجاح'),
+                    backgroundColor: Colors.teal,
+                  ),
                 );
               },
               child: const Text('حفظ التعديل'),
@@ -552,7 +646,6 @@ class CowDetailScreen extends ConsumerWidget {
       ),
     );
   }
-
 
   Widget _buildDetailRow(
     String title,
@@ -587,6 +680,95 @@ class CowDetailScreen extends ConsumerWidget {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildMainRemainingBox(BuildContext context, Cow cow) {
+    final daysSinceInsemination = cow.daysSinceInsemination;
+    final daysRemaining = 280 - daysSinceInsemination;
+    final isBirth = cow.isPostBirth;
+    final isOverdue = !isBirth && daysRemaining < 0;
+
+    String label = isBirth
+        ? 'منذ الولادة'
+        : (isOverdue ? 'تجاوزت موعد الولادة' : 'متبقي للولادة');
+    String value = isBirth
+        ? '${cow.daysSinceBirth}'
+        : (isOverdue ? '${daysRemaining.abs()}' : '${daysRemaining}');
+
+    Color boxColor = isOverdue ? Colors.red : cow.color;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: boxColor.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: boxColor.withValues(alpha: 0.15), width: 1.5),
+        gradient: LinearGradient(
+          colors: [boxColor.withValues(alpha: 0.08), Colors.transparent],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: boxColor.withValues(alpha: 0.7),
+                ),
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 48,
+                      fontWeight: FontWeight.w900,
+                      color: isOverdue
+                          ? Colors.red
+                          : Theme.of(context).colorScheme.onSurface,
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'يوم',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.3),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: boxColor.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isBirth ? Icons.child_care : Icons.calendar_month,
+              color: boxColor,
+              size: 40,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

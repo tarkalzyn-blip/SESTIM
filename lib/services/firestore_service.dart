@@ -10,6 +10,11 @@ class FirestoreService {
   String? get _userId => _auth.currentUser?.uid;
 
   CollectionReference get _cowsCollection => _db.collection('users').doc(_userId).collection('cows');
+  CollectionReference get _notesCollection => _db.collection('users').doc(_userId).collection('notes');
+
+  /// Stream of Firebase Auth UID changes (null when logged out)
+  Stream<String?> get authStateChanges =>
+      _auth.authStateChanges().map((user) => user?.uid);
 
   // Stream of cows for the current user
   Stream<List<Cow>> get cowsStream {
@@ -21,18 +26,34 @@ class FirestoreService {
     });
   }
 
+  // Stream of notes for the current user
+  Stream<List<Map<String, dynamic>>> get notesStream {
+    if (_userId == null) return Stream.value([]);
+    return _notesCollection.snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
+    });
+  }
+
   // Save or update cow
   Future<void> saveCow(Cow cow) async {
-    if (_userId == null) {
-      debugPrint("Firestore: Cannot save, user not logged in.");
-      return;
-    }
+    if (_userId == null) return;
     try {
       final cowWithUser = cow.copyWith(userId: _userId);
       await _cowsCollection.doc(cow.uniqueKey).set(cowWithUser.toMap());
-      debugPrint("Firestore: Success saving cow ${cow.id}");
     } catch (e) {
       debugPrint("Firestore Error saving cow: $e");
+      rethrow;
+    }
+  }
+
+  // Save or update note
+  Future<void> saveNote(Map<String, dynamic> noteMap) async {
+    if (_userId == null) return;
+    try {
+      noteMap['userId'] = _userId;
+      await _notesCollection.doc(noteMap['id']).set(noteMap);
+    } catch (e) {
+      debugPrint("Firestore Error saving note: $e");
       rethrow;
     }
   }
@@ -42,9 +63,19 @@ class FirestoreService {
     if (_userId == null) return;
     try {
       await _cowsCollection.doc(uniqueKey).delete();
-      debugPrint("Firestore: Success deleting cow $uniqueKey");
     } catch (e) {
       debugPrint("Firestore Error deleting cow: $e");
+      rethrow;
+    }
+  }
+
+  // Delete note
+  Future<void> deleteNote(String noteId) async {
+    if (_userId == null) return;
+    try {
+      await _notesCollection.doc(noteId).delete();
+    } catch (e) {
+      debugPrint("Firestore Error deleting note: $e");
       rethrow;
     }
   }
@@ -59,9 +90,24 @@ class FirestoreService {
         batch.set(_cowsCollection.doc(cow.uniqueKey), cowWithUser.toMap());
       }
       await batch.commit();
-      debugPrint("Firestore: Success batch sync ${localCows.length} cows");
     } catch (e) {
-      debugPrint("Firestore Error batch sync: $e");
+      debugPrint("Firestore Error batch sync cows: $e");
+      rethrow;
+    }
+  }
+
+  // Sync notes from local to cloud
+  Future<void> syncLocalNotesToCloud(List<Map<String, dynamic>> localNotes) async {
+    if (_userId == null) return;
+    try {
+      final batch = _db.batch();
+      for (var note in localNotes) {
+        note['userId'] = _userId;
+        batch.set(_notesCollection.doc(note['id']), note);
+      }
+      await batch.commit();
+    } catch (e) {
+      debugPrint("Firestore Error batch sync notes: $e");
       rethrow;
     }
   }

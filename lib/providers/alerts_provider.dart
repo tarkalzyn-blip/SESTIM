@@ -32,6 +32,9 @@ final alertsProvider = Provider<List<SmartAlert>>((ref) {
   final cows = ref.watch(cowProvider);
   final pregnancyDays = AppSettings.pregnancyDays;
   final recoveryDays = AppSettings.recoveryDays;
+  final lateInseminationDays = AppSettings.lateInseminationDays;
+  final dryingDays = AppSettings.dryingDays;
+  final heatCycleDays = AppSettings.heatCycleDays;
 
   List<SmartAlert> alerts = [];
 
@@ -41,14 +44,14 @@ final alertsProvider = Provider<List<SmartAlert>>((ref) {
       final daysSinceInsemination = cow.daysSinceInsemination;
       final daysRemaining = pregnancyDays - daysSinceInsemination;
 
-      // Heat Monitoring (Day 19 to 25 after insemination)
-      if (daysSinceInsemination >= 19 && daysSinceInsemination <= 25) {
+      // Heat Monitoring (Using heatCycleDays setting, window: -2 to +4 days)
+      if (daysSinceInsemination >= (heatCycleDays - 2) && daysSinceInsemination <= (heatCycleDays + 4)) {
         alerts.add(
           SmartAlert(
             id: 'heat_${cow.uniqueKey}',
             title: 'مراقبة الشبق',
             description:
-                'البقرة #${cow.id} مر $daysSinceInsemination يوم على التلقيح. يرجى مراقبتها للتأكد من عدم عودتها للشبق.',
+                'مر عليها $daysSinceInsemination يوم من التلقيح، يرجى مراقبتها.',
             severity: AlertSeverity.high,
             type: AlertType.heat,
             relatedCowKey: cow.uniqueKey,
@@ -63,9 +66,9 @@ final alertsProvider = Provider<List<SmartAlert>>((ref) {
         alerts.add(
           SmartAlert(
             id: 'birth_${cow.uniqueKey}',
-            title: 'ولادة وشيكة جداً',
+            title: 'ولادة وشيكة',
             description:
-                'البقرة #${cow.id} متبقي على ولادتها $daysRemaining يوم فقط.',
+                'متبقي على ولادتها $daysRemaining يوم فقط.',
             severity: AlertSeverity.high,
             type: AlertType.birth,
             relatedCowKey: cow.uniqueKey,
@@ -80,9 +83,9 @@ final alertsProvider = Provider<List<SmartAlert>>((ref) {
         alerts.add(
           SmartAlert(
             id: 'overdue_${cow.uniqueKey}',
-            title: 'تأخر في موعد الولادة!',
+            title: 'تأخر في الولادة!',
             description:
-                'البقرة #${cow.id} تجاوزت موعد ولادتها بـ ${daysRemaining.abs()} يوم. يرجى تسجيل حالة الولادة.',
+                'تجاوزت موعد ولادتها بـ ${daysRemaining.abs()} يوم، سجل الولادة الآن.',
             severity: AlertSeverity.high,
             type: AlertType.birth,
             relatedCowKey: cow.uniqueKey,
@@ -92,14 +95,14 @@ final alertsProvider = Provider<List<SmartAlert>>((ref) {
         );
       }
 
-      // Drying Off (between 45 and 65 days remaining)
-      if (daysRemaining <= 65 && daysRemaining >= 45) {
+      // Drying Off (between 20 and dryingDays remaining)
+      if (daysRemaining <= dryingDays && daysRemaining > 20) {
         alerts.add(
           SmartAlert(
             id: 'drying_${cow.uniqueKey}',
-            title: 'موعد تجفيف البقرة',
+            title: 'موعد تجفيف',
             description:
-                'البقرة #${cow.id} متبقي على ولادتها $daysRemaining يوم، يجب البدء بتجفيفها وإيقاف الحلب.',
+                'متبقي على ولادتها $daysRemaining يوم، ابدأ بالتجفيف الآن.',
             severity: AlertSeverity.medium,
             type: AlertType.drying,
             relatedCowKey: cow.uniqueKey,
@@ -114,14 +117,14 @@ final alertsProvider = Provider<List<SmartAlert>>((ref) {
     if (cow.isPostBirth) {
       final daysSinceBirth = cow.daysSinceBirth;
 
-      if (daysSinceBirth > 65) {
+      if (daysSinceBirth > lateInseminationDays) {
         // Late for insemination
         alerts.add(
           SmartAlert(
             id: 'lateInsem_${cow.uniqueKey}',
             title: 'تأخر في التلقيح',
             description:
-                'البقرة #${cow.id} مر $daysSinceBirth يوم على ولادتها ولم يتم تلقيحها بعد!',
+                'مضى عليها $daysSinceBirth يوم من الولادة ولم تلقح بعد!',
             severity: AlertSeverity.high,
             type: AlertType.lateInsemination,
             relatedCowKey: cow.uniqueKey,
@@ -129,14 +132,14 @@ final alertsProvider = Provider<List<SmartAlert>>((ref) {
             cowColorValue: cow.colorValue,
           ),
         );
-      } else if (daysSinceBirth >= recoveryDays && daysSinceBirth <= 65) {
+      } else if (daysSinceBirth >= recoveryDays && daysSinceBirth <= lateInseminationDays) {
         // Ready for insemination
         alerts.add(
           SmartAlert(
             id: 'recovery_${cow.uniqueKey}',
-            title: 'انتهاء فترة التعافي',
+            title: 'جاهزة للتلقيح',
             description:
-                'البقرة #${cow.id} أتمت $daysSinceBirth يوم بعد الولادة، وأصبحت جاهزة للتلقيح.',
+                'أتمت $daysSinceBirth يوم بعد الولادة، وهي جاهزة للتلقيح.',
             severity: AlertSeverity.low,
             type: AlertType.recovery,
             relatedCowKey: cow.uniqueKey,
