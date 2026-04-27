@@ -11,6 +11,7 @@ class FirestoreService {
 
   CollectionReference get _cowsCollection => _db.collection('users').doc(_userId).collection('cows');
   CollectionReference get _notesCollection => _db.collection('users').doc(_userId).collection('notes');
+  DocumentReference get _settingsDoc => _db.collection('users').doc(_userId).collection('settings').doc('security');
 
   /// Stream of Firebase Auth UID changes (null when logged out)
   Stream<String?> get authStateChanges =>
@@ -32,6 +33,17 @@ class FirestoreService {
     return _notesCollection.snapshots().map((snapshot) {
       return snapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
     });
+  }
+
+  // Stream of security settings
+  Stream<Map<String, dynamic>?> get securitySettingsStream {
+    if (_userId == null) return Stream.value(null);
+    return _settingsDoc.snapshots().map((doc) => doc.data() as Map<String, dynamic>?);
+  }
+
+  Future<void> updateSecuritySettings(Map<String, dynamic> settings) async {
+    if (_userId == null) return;
+    await _settingsDoc.set(settings, SetOptions(merge: true));
   }
 
   // Save or update cow

@@ -10,6 +10,7 @@ import 'package:cow_pregnancy/utils/app_settings.dart';
 import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
 import 'package:cow_pregnancy/screens/settings_screen.dart';
 import 'package:cow_pregnancy/widgets/animated_action_card.dart';
+import 'package:cow_pregnancy/providers/edit_access_provider.dart';
 
 class CowDetailScreen extends ConsumerWidget {
   final Cow cow;
@@ -52,49 +53,53 @@ class CowDetailScreen extends ConsumerWidget {
                 icon: const Icon(Icons.edit, color: Colors.white),
                 tooltip: 'تعديل بيانات البقرة',
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => AddEditCowScreen(cow: currentCow),
-                    ),
-                  );
+                  ref.read(editAccessProvider.notifier).runWithAccess(context, () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => AddEditCowScreen(cow: currentCow),
+                      ),
+                    );
+                  });
                 },
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline, color: Colors.white),
                 tooltip: 'حذف البقرة',
-                onPressed: () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('حذف البقرة'),
-                      content: Text(
-                        'هل أنت متأكد من حذف البقرة رقم ${currentCow.id}؟ لا يمكن التراجع عن هذا.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('إلغاء'),
+                onPressed: () {
+                  ref.read(editAccessProvider.notifier).runWithAccess(context, () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('حذف البقرة'),
+                        content: Text(
+                          'هل أنت متأكد من حذف البقرة رقم ${currentCow.id}؟ لا يمكن التراجع عن هذا.',
                         ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text(
-                            'حذف',
-                            style: TextStyle(
-                              color: Colors.red,
-                              fontWeight: FontWeight.bold,
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('إلغاء'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text(
+                              'حذف',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirm == true) {
-                    ref
-                        .read(cowProvider.notifier)
-                        .deleteCow(currentCow.uniqueKey);
-                    if (context.mounted) Navigator.pop(context);
-                  }
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      ref
+                          .read(cowProvider.notifier)
+                          .deleteCow(currentCow.uniqueKey);
+                      if (context.mounted) Navigator.pop(context);
+                    }
+                  });
                 },
               ),
             ],
@@ -321,8 +326,10 @@ class CowDetailScreen extends ConsumerWidget {
                             icon: Icons.child_friendly,
                             label: 'تسجيل ولادة',
                             color: Colors.teal,
-                            onTap: () =>
-                                _showBirthDialog(context, ref, currentCow),
+                            onTap: () => ref.read(editAccessProvider.notifier).runWithAccess(
+                                  context,
+                                  () => _showBirthDialog(context, ref, currentCow),
+                                ),
                           ),
                         ),
                       if (currentCow.isInseminated && !currentCow.isPostBirth)
@@ -332,10 +339,13 @@ class CowDetailScreen extends ConsumerWidget {
                           icon: Icons.science_outlined,
                           label: 'تسجيل تلقيح',
                           color: Colors.blueAccent,
-                          onTap: () => _showAddInseminationDialog(
+                          onTap: () => ref.read(editAccessProvider.notifier).runWithAccess(
                             context,
-                            ref,
-                            currentCow,
+                            () => _showAddInseminationDialog(
+                              context,
+                              ref,
+                              currentCow,
+                            ),
                           ),
                         ),
                       ),
@@ -348,7 +358,10 @@ class CowDetailScreen extends ConsumerWidget {
                       icon: Icons.note_add_outlined,
                       label: 'إضافة ملاحظة',
                       color: Colors.orange,
-                      onTap: () => _showAddNoteDialog(context, ref, currentCow),
+                      onTap: () => ref.read(editAccessProvider.notifier).runWithAccess(
+                        context,
+                        () => _showAddNoteDialog(context, ref, currentCow),
+                      ),
                     ),
                   ),
 
@@ -439,7 +452,10 @@ class CowDetailScreen extends ConsumerWidget {
                   subtitle: const Text('تعديل الملاحظة أو التاريخ'),
                   onTap: () {
                     Navigator.pop(ctx);
-                    _showEditHistoryDialog(context, ref, currentCow, event);
+                    ref.read(editAccessProvider.notifier).runWithAccess(
+                      context,
+                      () => _showEditHistoryDialog(context, ref, currentCow, event),
+                    );
                   },
                 ),
                 const Divider(height: 1, indent: 16, endIndent: 16),
@@ -458,45 +474,45 @@ class CowDetailScreen extends ConsumerWidget {
                   subtitle: const Text('إزالة هذا الحدث من السجل التاريخي'),
                   onTap: () {
                     Navigator.pop(ctx);
-                    showDialog(
-                      context: context,
-                      builder: (dctx) => AlertDialog(
-                        title: const Text('حذف السجل'),
-                        content: Text('هل أنت متأكد من حذف "$title"؟'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(dctx),
-                            child: const Text('إلغاء'),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pop(dctx);
-                              final newHistory = currentCow.history
-                                  .where((e) => e['eventId'] != eventId)
-                                  .toList();
-                              ref
-                                  .read(cowProvider.notifier)
-                                  .updateCow(
-                                    currentCow.copyWith(history: newHistory),
-                                  );
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('تم حذف السجل'),
-                                  backgroundColor: Colors.red,
+                    ref.read(editAccessProvider.notifier).runWithAccess(context, () {
+                      showDialog(
+                        context: context,
+                        builder: (dctx) => AlertDialog(
+                          title: const Text('حذف السجل'),
+                          content: Text('هل أنت متأكد من حذف "$title"؟'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dctx),
+                              child: const Text('إلغاء'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(dctx);
+                                final newHistory = currentCow.history
+                                    .where((e) => e['eventId'] != eventId)
+                                    .toList();
+                                ref.read(cowProvider.notifier).updateCow(
+                                      currentCow.copyWith(history: newHistory),
+                                    );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('تم حذف السجل'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              },
+                              child: const Text(
+                                'حذف',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                              );
-                            },
-                            child: const Text(
-                              'حذف',
-                              style: TextStyle(
-                                color: Colors.red,
-                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    );
+                          ],
+                        ),
+                      );
+                    });
                   },
                 ),
                 const Divider(height: 1, indent: 16, endIndent: 16),

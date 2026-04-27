@@ -6,6 +6,7 @@ import 'package:cow_pregnancy/models/cow_model.dart';
 import 'package:cow_pregnancy/services/notification_service.dart';
 import 'package:cow_pregnancy/screens/settings_screen.dart';
 import 'package:uuid/uuid.dart';
+import 'package:cow_pregnancy/providers/edit_access_provider.dart';
 
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:cow_pregnancy/utils/date_picker_utils.dart';
@@ -39,7 +40,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 90.0),
         child: FloatingActionButton(
-          onPressed: () => _showAddNoteSheet(context),
+          onPressed: () => ref.read(editAccessProvider.notifier).runWithAccess(
+            context,
+            () => _showAddNoteSheet(context),
+          ),
           backgroundColor: theme.colorScheme.primary,
           child: const Icon(Icons.add, color: Colors.white),
         ),
@@ -70,7 +74,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                 final note = notes[index];
                 return _NoteCard(
                   note: note,
-                  onEdit: () => _showAddNoteSheet(context, note),
+                  onEdit: () => ref.read(editAccessProvider.notifier).runWithAccess(
+                    context,
+                    () => _showAddNoteSheet(context, note),
+                  ),
                 );
               },
             ),
@@ -134,7 +141,10 @@ class _NoteCard extends ConsumerWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(15),
         onTap: onEdit,
-        onLongPress: () => _confirmDelete(context, ref),
+        onLongPress: () => ref.read(editAccessProvider.notifier).runWithAccess(
+          context,
+          () => _confirmDelete(context, ref),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(

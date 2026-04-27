@@ -5,6 +5,7 @@ import 'package:cow_pregnancy/screens/add_edit_cow_screen.dart';
 import 'package:cow_pregnancy/widgets/cow_card.dart';
 import 'package:cow_pregnancy/widgets/cow_search_delegate.dart';
 import 'package:cow_pregnancy/screens/settings_screen.dart';
+import 'package:cow_pregnancy/providers/edit_access_provider.dart';
 
 class CowsListScreen extends ConsumerWidget {
   const CowsListScreen({super.key});
@@ -16,11 +17,17 @@ class CowsListScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('إدارة الأبقار', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'إدارة الأبقار',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.settings),
-          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SettingsScreen()),
+          ),
         ),
         actions: [
           IconButton(
@@ -38,9 +45,12 @@ class CowsListScreen extends ConsumerWidget {
             icon: const Icon(Icons.add_circle_outline, size: 28),
             tooltip: 'إضافة بقرة',
             onPressed: () {
-              Navigator.push(context, MaterialPageRoute(
-                builder: (_) => const AddEditCowScreen(),
-              ));
+              ref.read(editAccessProvider.notifier).runWithAccess(context, () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AddEditCowScreen()),
+                );
+              });
             },
           ),
           const SizedBox(width: 8),
@@ -59,13 +69,33 @@ class CowsListScreen extends ConsumerWidget {
                   children: [
                     _buildFilterChip(ref, 'الكل', CowFilter.all, currentFilter),
                     const SizedBox(width: 8),
-                    _buildFilterChip(ref, 'الحوامل', CowFilter.pregnant, currentFilter),
+                    _buildFilterChip(
+                      ref,
+                      'الحوامل',
+                      CowFilter.pregnant,
+                      currentFilter,
+                    ),
                     const SizedBox(width: 8),
-                    _buildFilterChip(ref, 'تحتاج مراقبة', CowFilter.monitoring, currentFilter),
+                    _buildFilterChip(
+                      ref,
+                      'تحتاج مراقبة',
+                      CowFilter.monitoring,
+                      currentFilter,
+                    ),
                     const SizedBox(width: 8),
-                    _buildFilterChip(ref, 'بدون لقاح', CowFilter.notInseminated, currentFilter),
+                    _buildFilterChip(
+                      ref,
+                      'بدون لقاح',
+                      CowFilter.notInseminated,
+                      currentFilter,
+                    ),
                     const SizedBox(width: 8),
-                    _buildFilterChip(ref, 'بعد الولادة', CowFilter.postBirth, currentFilter),
+                    _buildFilterChip(
+                      ref,
+                      'بعد الولادة',
+                      CowFilter.postBirth,
+                      currentFilter,
+                    ),
                   ],
                 ),
               ),
@@ -77,9 +107,12 @@ class CowsListScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: InkWell(
                 onTap: () {
-                  Navigator.push(context, MaterialPageRoute(
-                    builder: (_) => const AddEditCowScreen(),
-                  ));
+                  ref.read(editAccessProvider.notifier).runWithAccess(context, () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AddEditCowScreen()),
+                    );
+                  });
                 },
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
@@ -91,7 +124,8 @@ class CowsListScreen extends ConsumerWidget {
                     border: Border.all(
                       color: Colors.green,
                       width: 1.5,
-                      style: BorderStyle.solid, // Note: We use solid here but simulate dashed visually, or just solid. Wait, the user asked for dashed. 
+                      style: BorderStyle
+                          .solid, // Note: We use solid here but simulate dashed visually, or just solid. Wait, the user asked for dashed.
                       // Flutter standard BoxDecoration doesn't have dashed border easily without a custom painter or package.
                       // Let's just use a nice solid green border or a dashed-looking widget if needed, but a solid 1px green border with green background is actually very close to the picture. Let's use dotted_border if available, else solid. I don't know if dotted_border is in pubspec, so I'll stick to a nice solid/translucent border for safety.
                     ),
@@ -117,25 +151,28 @@ class CowsListScreen extends ConsumerWidget {
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 16)),
           SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final cow = filteredCows[index];
-                return Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                      child: CowCard(cow: cow, index: index),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final cow = filteredCows[index];
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
                     ),
-                    if (index < filteredCows.length - 1)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                        child: Divider(color: Colors.grey.withValues(alpha: 0.1), thickness: 1),
+                    child: CowCard(cow: cow, index: index),
+                  ),
+                  if (index < filteredCows.length - 1)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                      child: Divider(
+                        color: Colors.grey.withValues(alpha: 0.1),
+                        thickness: 1,
                       ),
-                  ],
-                );
-              },
-              childCount: filteredCows.length,
-            ),
+                    ),
+                ],
+              );
+            }, childCount: filteredCows.length),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
@@ -143,7 +180,12 @@ class CowsListScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildFilterChip(WidgetRef ref, String label, CowFilter filter, CowFilter currentFilter) {
+  Widget _buildFilterChip(
+    WidgetRef ref,
+    String label,
+    CowFilter filter,
+    CowFilter currentFilter,
+  ) {
     final isSelected = currentFilter == filter;
     return ChoiceChip(
       label: Text(label),
@@ -165,7 +207,7 @@ class CowsListScreen extends ConsumerWidget {
     final currentSort = ref.read(sortProvider);
     CowSortCriteria tempCriteria = currentSort.criteria;
     CowSortOrder tempOrder = currentSort.order;
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -176,7 +218,9 @@ class CowsListScreen extends ConsumerWidget {
             return Container(
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surface,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Column(
@@ -195,7 +239,7 @@ class CowsListScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   const Text(
                     'ترتيب البيانات',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -210,18 +254,21 @@ class CowsListScreen extends ConsumerWidget {
                     label: 'ترتيب تصاعدي',
                     icon: Icons.sort_by_alpha,
                     selected: tempOrder == CowSortOrder.ascending,
-                    onTap: () => setModalState(() => tempOrder = CowSortOrder.ascending),
+                    onTap: () =>
+                        setModalState(() => tempOrder = CowSortOrder.ascending),
                   ),
                   _buildSortOption(
                     context,
                     label: 'ترتيب تنازلي',
                     icon: Icons.filter_list_alt,
                     selected: tempOrder == CowSortOrder.descending,
-                    onTap: () => setModalState(() => tempOrder = CowSortOrder.descending),
+                    onTap: () => setModalState(
+                      () => tempOrder = CowSortOrder.descending,
+                    ),
                   ),
 
                   const SizedBox(height: 24),
-                  
+
                   // Section 2: Criteria
                   _buildSectionTitle('معيار الترتيب'),
                   const SizedBox(height: 12),
@@ -230,21 +277,26 @@ class CowsListScreen extends ConsumerWidget {
                     label: 'رقم البقرة',
                     icon: Icons.numbers,
                     selected: tempCriteria == CowSortCriteria.id,
-                    onTap: () => setModalState(() => tempCriteria = CowSortCriteria.id),
+                    onTap: () =>
+                        setModalState(() => tempCriteria = CowSortCriteria.id),
                   ),
                   _buildSortOption(
                     context,
                     label: 'تاريخ اللقاح',
                     icon: Icons.calendar_today,
                     selected: tempCriteria == CowSortCriteria.inseminationDate,
-                    onTap: () => setModalState(() => tempCriteria = CowSortCriteria.inseminationDate),
+                    onTap: () => setModalState(
+                      () => tempCriteria = CowSortCriteria.inseminationDate,
+                    ),
                   ),
                   _buildSortOption(
                     context,
                     label: 'تاريخ الولادة',
                     icon: Icons.child_friendly,
                     selected: tempCriteria == CowSortCriteria.birthDate,
-                    onTap: () => setModalState(() => tempCriteria = CowSortCriteria.birthDate),
+                    onTap: () => setModalState(
+                      () => tempCriteria = CowSortCriteria.birthDate,
+                    ),
                   ),
 
                   const SizedBox(height: 32),
@@ -255,14 +307,24 @@ class CowsListScreen extends ConsumerWidget {
                     height: 56,
                     child: FilledButton(
                       style: FilledButton.styleFrom(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
                       onPressed: () {
-                        ref.read(sortProvider.notifier).setCriteria(tempCriteria);
+                        ref
+                            .read(sortProvider.notifier)
+                            .setCriteria(tempCriteria);
                         ref.read(sortProvider.notifier).setOrder(tempOrder);
                         Navigator.pop(context);
                       },
-                      child: const Text('تطبيق', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'تطبيق',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                   SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
@@ -278,11 +340,21 @@ class CowsListScreen extends ConsumerWidget {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
+      style: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.bold,
+        color: Colors.grey,
+      ),
     );
   }
 
-  Widget _buildSortOption(BuildContext context, {required String label, required IconData icon, required bool selected, required VoidCallback onTap}) {
+  Widget _buildSortOption(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: Material(
@@ -294,23 +366,37 @@ class CowsListScreen extends ConsumerWidget {
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: selected ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.05) : Theme.of(context).colorScheme.surface,
+              color: selected
+                  ? Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.05)
+                  : Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: selected ? Theme.of(context).colorScheme.primary : Colors.grey.withOpacity(0.1),
+                color: selected
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.grey.withOpacity(0.1),
                 width: selected ? 1.5 : 1,
               ),
             ),
             child: Row(
               children: [
-                Icon(icon, color: selected ? Theme.of(context).colorScheme.primary : Colors.grey, size: 20),
+                Icon(
+                  icon,
+                  color: selected
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.grey,
+                  size: 20,
+                ),
                 const SizedBox(width: 16),
                 Text(
                   label,
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: selected ? FontWeight.bold : FontWeight.w500,
-                    color: selected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurface,
+                    color: selected
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 const Spacer(),

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:cow_pregnancy/widgets/custom_date_picker.dart';
 import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
 import 'package:cow_pregnancy/screens/settings_screen.dart';
+import 'package:cow_pregnancy/providers/edit_access_provider.dart';
 
 class CalfDetailScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> calfData;
@@ -585,7 +586,11 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
               children: [
                 Expanded(
                   child: InkWell(
-                    onTap: isExited ? null : _showAddWeightDialog,
+                    onTap: isExited
+                        ? null
+                        : () => ref
+                            .read(editAccessProvider.notifier)
+                            .runWithAccess(context, _showAddWeightDialog),
                     borderRadius: BorderRadius.circular(15),
                     child: _buildActionBtn(
                       Icons.monitor_weight_outlined,
@@ -597,7 +602,11 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: InkWell(
-                    onTap: isExited ? null : _showAddVaccineDialog,
+                    onTap: isExited
+                        ? null
+                        : () => ref
+                            .read(editAccessProvider.notifier)
+                            .runWithAccess(context, _showAddVaccineDialog),
                     borderRadius: BorderRadius.circular(15),
                     child: _buildActionBtn(
                       Icons.vaccines_outlined,
@@ -700,7 +709,9 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
                     borderRadius: BorderRadius.circular(15),
                   ),
                 ),
-                onPressed: _showExitDialog,
+                onPressed: () => ref
+                    .read(editAccessProvider.notifier)
+                    .runWithAccess(context, _showExitDialog),
               ),
           ],
         ),
