@@ -47,13 +47,19 @@ class NotificationService {
       await _notificationsPlugin.initialize(
         settings: initializationSettings,
       );
-      
+    } catch (e) {
+      debugPrint('Notification Initialization Error: $e');
+    }
+  }
+
+  Future<void> requestPermission() async {
+    try {
       if (!kIsWeb && Platform.isAndroid) {
         _notificationsPlugin.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
       }
     } catch (e) {
-      debugPrint('Notification Initialization Error: $e');
+      debugPrint('Notification Permission Error: $e');
     }
   }
 

@@ -11,6 +11,8 @@ import 'package:cow_pregnancy/screens/about_screen.dart';
 import 'package:cow_pregnancy/providers/edit_access_provider.dart';
 import 'package:cow_pregnancy/providers/settings_provider.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:cow_pregnancy/models/cow_model.dart';
+import 'package:cow_pregnancy/widgets/cow_card.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -294,6 +296,15 @@ class AppearanceSettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = ref.watch(themeProvider);
     final currentFont = ref.watch(fontProvider);
+    final fontScale = ref.watch(fontScaleProvider);
+
+    final previewCow = Cow(
+      id: 'A-150',
+      inseminationDate: DateTime.now().subtract(const Duration(days: 40)),
+      colorValue: Colors.teal.value,
+      isInseminated: true,
+      history: [],
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('المظهر والخط')),
@@ -354,10 +365,66 @@ class AppearanceSettingsPage extends ConsumerWidget {
               items: [
                 'Cairo',
                 'Tajawal',
+                'Almarai',
+                'Traditional',
+                'Changa',
               ].map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
               onChanged: (val) {
                 if (val != null) ref.read(fontProvider.notifier).setFont(val);
               },
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 8),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.0),
+            child: Text(
+              'حجم خط التطبيق (معاينة حية)',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Preview Card
+          IgnorePointer(
+            child: CowCard(cow: previewCow),
+          ),
+          const SizedBox(height: 16),
+          // Font Scale Slider
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                const Text('A', style: TextStyle(fontSize: 16)),
+                Expanded(
+                  child: Slider(
+                    value: fontScale,
+                    min: 1.0,
+                    max: 1.4,
+                    divisions: 4,
+                    label: '${(fontScale * 100).toInt()}%',
+                    activeColor: Colors.teal,
+                    inactiveColor: Colors.teal.withOpacity(0.2),
+                    onChanged: (val) {
+                      ref.read(fontScaleProvider.notifier).setScale(val);
+                    },
+                  ),
+                ),
+                const Text('A', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.0),
+            child: Text(
+              'قم بسحب الشريط لتكبير الخط. لن تتأثر الأيقونات بهذا التغيير حفاظاً على شكل التطبيق.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+              textAlign: TextAlign.center,
             ),
           ),
         ],

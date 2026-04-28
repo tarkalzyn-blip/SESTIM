@@ -48,6 +48,9 @@ class AppSettings {
   static String get fontFamily => _box.get('fontFamily', defaultValue: 'Cairo');
   static Future<void> setFontFamily(String val) => _box.put('fontFamily', val);
 
+  static double get fontScale => _box.get('fontScale', defaultValue: 1.0);
+  static Future<void> setFontScale(double val) => _box.put('fontScale', val);
+
   static String get notificationSound =>
       _box.get('notificationSound', defaultValue: 'default_sound');
   static Future<void> setNotificationSound(String val) =>

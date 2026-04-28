@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cow_pregnancy/providers/theme_provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cow_pregnancy/screens/auth_wrapper.dart';
+import 'package:cow_pregnancy/screens/splash_screen.dart';
 import 'firebase_options.dart'; // ستحتاج لتشغيل flutterfire configure لتوليد هذا الملف
 
 void main() async {
@@ -23,14 +24,45 @@ void main() async {
   }
 
   // Initialize Hive
-  await Hive.initFlutter();
-  Hive.registerAdapter(CowAdapter());
-  await Hive.openBox<Cow>('cows');
-  await Hive.openBox('notes_box'); // New box for notes
-  await Hive.openBox('settings');
+  try {
+    await Hive.initFlutter();
+    try {
+      Hive.registerAdapter(CowAdapter());
+    } catch (e) {
+      debugPrint("Adapter already registered: $e");
+    }
+    
+    try {
+      await Hive.openBox<Cow>('cows');
+    } catch (e) {
+      debugPrint("Error opening cows box: $e");
+      await Hive.deleteBoxFromDisk('cows');
+      await Hive.openBox<Cow>('cows');
+    }
+
+    try {
+      await Hive.openBox('notes_box');
+    } catch (e) {
+      await Hive.deleteBoxFromDisk('notes_box');
+      await Hive.openBox('notes_box');
+    }
+
+    try {
+      await Hive.openBox('settings');
+    } catch (e) {
+      await Hive.deleteBoxFromDisk('settings');
+      await Hive.openBox('settings');
+    }
+  } catch (e) {
+    debugPrint("Hive initialization failed: $e");
+  }
 
   // Initialize Notifications
-  await NotificationService().init();
+  try {
+    await NotificationService().init();
+  } catch (e) {
+    debugPrint("Notification init failed: $e");
+  }
 
   runApp(const ProviderScope(child: MyApp()));
 }
@@ -42,12 +74,21 @@ class MyApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDarkMode = ref.watch(themeProvider);
     final fontFamily = ref.watch(fontProvider);
+    final textScale = ref.watch(fontScaleProvider);
 
     TextTheme getTextTheme(TextTheme base) {
-      if (fontFamily == 'Tajawal') {
-        return GoogleFonts.tajawalTextTheme(base);
+      switch (fontFamily) {
+        case 'Tajawal':
+          return GoogleFonts.tajawalTextTheme(base);
+        case 'Almarai':
+          return GoogleFonts.almaraiTextTheme(base);
+        case 'Traditional':
+          return GoogleFonts.notoNaskhArabicTextTheme(base);
+        case 'Changa':
+          return GoogleFonts.changaTextTheme(base);
+        default:
+          return GoogleFonts.cairoTextTheme(base);
       }
-      return GoogleFonts.cairoTextTheme(base);
     }
 
     return MaterialApp(
@@ -76,9 +117,14 @@ class MyApp extends ConsumerWidget {
         useMaterial3: true,
         textTheme: getTextTheme(ThemeData.dark().textTheme),
       ),
-      home: const AuthWrapper(),
+      home: const SplashScreen(),
       builder: (context, child) {
-        return Directionality(textDirection: TextDirection.rtl, child: child!);
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(textScale),
+          ),
+          child: Directionality(textDirection: TextDirection.rtl, child: child!),
+        );
       },
     );
   }

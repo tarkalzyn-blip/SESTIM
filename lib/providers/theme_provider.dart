@@ -29,6 +29,20 @@ class FontNotifier extends Notifier<String> {
 
 final fontProvider = NotifierProvider<FontNotifier, String>(() => FontNotifier());
 
+class FontScaleNotifier extends Notifier<double> {
+  @override
+  double build() {
+    return AppSettings.fontScale;
+  }
+
+  void setScale(double scale) {
+    AppSettings.setFontScale(scale);
+    state = scale;
+  }
+}
+
+final fontScaleProvider = NotifierProvider<FontScaleNotifier, double>(() => FontScaleNotifier());
+
 class SyncStatusNotifier extends Notifier<String?> {
   @override
   String? build() => null;
