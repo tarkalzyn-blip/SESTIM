@@ -10,6 +10,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:cow_pregnancy/screens/about_screen.dart';
 import 'package:cow_pregnancy/providers/edit_access_provider.dart';
 import 'package:cow_pregnancy/providers/settings_provider.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -1077,132 +1078,224 @@ class _AdminSettingsBodyState extends ConsumerState<_AdminSettingsBody> {
   }
 }
 
-class CowColorsSettingsPage extends ConsumerWidget {
+class CowColorsSettingsPage extends ConsumerStatefulWidget {
   const CowColorsSettingsPage({super.key});
 
-  final List<Color> _palette = const [
-    Colors.blue,
-    Colors.red,
-    Colors.green,
-    Colors.orange,
-    Colors.purple,
-    Colors.teal,
-    Colors.pink,
-    Colors.brown,
-    Colors.amber,
-    Colors.cyan,
-    Colors.indigo,
-    Colors.lime,
-    Colors.deepOrange,
-    Colors.deepPurple,
-    Colors.lightBlue,
-    Colors.lightGreen,
-    Colors.blueGrey,
-  ];
+  @override
+  ConsumerState<CowColorsSettingsPage> createState() => _CowColorsSettingsPageState();
+}
+
+class _CowColorsSettingsPageState extends ConsumerState<CowColorsSettingsPage> {
+  Color _pickerColor = Colors.blue;
+
+  void _changeColor(Color color) {
+    setState(() => _pickerColor = color);
+  }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final availableColors = ref.watch(cowColorsProvider);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final String hexCode = '#${_pickerColor.value.toRadixString(16).substring(2).toUpperCase()}';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('ألوان الكروت')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text(
-            'الألوان المفعلة حالياً:',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: availableColors.map((colorVal) {
-              return Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: Color(colorVal),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(colorVal).withValues(alpha: 0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
+      appBar: AppBar(title: const Text('اختيار لون الكرت', style: TextStyle(fontWeight: FontWeight.bold))),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const SizedBox(height: 10),
+            // ── عجلة الألوان ─────────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
                   ),
-                  Positioned(
-                    right: -5,
-                    top: -5,
-                    child: GestureDetector(
-                      onTap: () {
-                        if (availableColors.length <= 1) {
+                ],
+              ),
+              child: Column(
+                children: [
+                  HueRingPicker(
+                    pickerColor: _pickerColor,
+                    onColorChanged: _changeColor,
+                    enableAlpha: false,
+                    displayThumbColor: true,
+                    colorPickerHeight: 250,
+                    hueRingStrokeWidth: 25,
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // ── معاينة اللون والكود ─────────────────────────────
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 45,
+                        height: 45,
+                        decoration: BoxDecoration(
+                          color: _pickerColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _pickerColor.withOpacity(0.4),
+                              blurRadius: 10,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.black26 : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                        ),
+                        child: Text(
+                          hexCode,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.5,
+                            color: isDark ? Colors.white70 : Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 24),
+
+                  // ── زر إضافة اللون ─────────────────────────────────
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        final int colorValue = _pickerColor.toARGB32();
+                        if (availableColors.contains(colorValue)) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('يجب أن يكون هناك لون واحد على الأقل')),
+                            const SnackBar(content: Text('اللون موجود مسبقاً!'), backgroundColor: Colors.orange),
                           );
                           return;
                         }
-                        _confirmDelete(context, ref, colorVal);
+                        ref.read(cowColorsProvider.notifier).addColor(colorValue);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('تم إضافة اللون بنجاح: $hexCode'), backgroundColor: Colors.green),
+                        );
                       },
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.remove, color: Colors.white, size: 18),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
+                      icon: const Icon(Icons.add_circle_outline, size: 22),
+                      label: const Text('إضافة اللون', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 40),
-          const Divider(),
-          const SizedBox(height: 20),
-          const Text(
-            'إضافة لون جديد من القائمة:',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-          const SizedBox(height: 16),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 5,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
+              ),
             ),
-            itemCount: _palette.length,
-            itemBuilder: (context, index) {
-              final color = _palette[index];
-              final isAlreadyAdded = availableColors.contains(color.toARGB32());
-              
-              return GestureDetector(
-                onTap: isAlreadyAdded ? null : () {
-                  ref.read(cowColorsProvider.notifier).addColor(color.toARGB32());
-                },
-                child: Opacity(
-                  opacity: isAlreadyAdded ? 0.3 : 1.0,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      border: isAlreadyAdded ? Border.all(color: Colors.grey, width: 2) : null,
-                    ),
-                    child: isAlreadyAdded ? const Icon(Icons.check, color: Colors.white) : null,
-                  ),
+            
+            const SizedBox(height: 40),
+            
+            // ── قسم الألوان المحفوظة ──────────────────────────────────
+            Row(
+              children: [
+                Icon(Icons.palette_rounded, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                const Text(
+                  'ألواني',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20),
                 ),
-              );
-            },
-          ),
-        ],
+              ],
+            ),
+            const SizedBox(height: 16),
+            
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDark ? theme.colorScheme.primary.withOpacity(0.05) : theme.colorScheme.primary.withOpacity(0.03),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: theme.colorScheme.primary.withOpacity(0.15), width: 1.5),
+              ),
+              child: availableColors.isEmpty
+                  ? const Text('لم يتم حفظ أي ألوان بعد.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey))
+                  : Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      children: availableColors.map((colorVal) {
+                        final color = Color(colorVal);
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOutBack,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              GestureDetector(
+                                onTap: () => _changeColor(color),
+                                child: Container(
+                                  width: 55,
+                                  height: 55,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2.5),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: color.withOpacity(0.35),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                        spreadRadius: 1,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                right: -4,
+                                top: -4,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    if (availableColors.length <= 1) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('يجب أن تحتفظ بلون واحد على الأقل.')),
+                                      );
+                                      return;
+                                    }
+                                    _confirmDelete(context, ref, colorVal);
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(3),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.shade400,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: 1.5),
+                                    ),
+                                    child: const Icon(Icons.close_rounded, color: Colors.white, size: 14),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1212,7 +1305,7 @@ class CowColorsSettingsPage extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('حذف اللون'),
-        content: const Text('هل أنت متأكد من رغبتك في حذف هذا اللون من قائمة الاختيارات؟ لن يتم حذفه من الأبقار التي تستخدمه حالياً، لكن لن يظهر في القائمة عند إضافة بقرة جديدة.'),
+        content: const Text('هل أنت متأكد من حذف هذا اللون من قائمتك؟\n\nلن يختفي اللون من الأبقار التي تستخدمه حالياً، لكنه لن يظهر في قائمة الاختيار مستقبلاً.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
           TextButton(
@@ -1220,7 +1313,7 @@ class CowColorsSettingsPage extends ConsumerWidget {
               ref.read(cowColorsProvider.notifier).removeColor(colorVal);
               Navigator.pop(ctx);
             },
-            child: const Text('حذف', style: TextStyle(color: Colors.red)),
+            child: const Text('حذف', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

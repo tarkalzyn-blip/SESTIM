@@ -285,6 +285,7 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
 
             TextFormField(
               controller: _idController,
+              textAlign: TextAlign.right,
               decoration: InputDecoration(
                 labelText: 'رقم/اسم البقرة *',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -351,12 +352,13 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _bullIdController,
+                textAlign: TextAlign.right,
                 decoration: InputDecoration(
-                  labelText: 'رقم الثور/العجل (اختياري)',
+                  labelText: 'رقم/اسم العجل (أو اتركه فارغاً)',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.pets),
+                  prefixIcon: const Icon(Icons.tag_outlined),
                 ),
-                onChanged: (_) => setState(() {}), // تحديث نص المعاينة
+                onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 12),
               // معاينة نص التسجيل الذكي
@@ -395,46 +397,70 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
             const SizedBox(height: 16),
 
             // ── الأنساب ────────────────────────────────────────────────
-            _buildSectionTitle('معلومات الأنساب (اختياري)', Icons.family_restroom),
-            const SizedBox(height: 16),
-
-            TextFormField(
-              controller: _motherIdController,
-              decoration: InputDecoration(
-                labelText: 'رقم الأم (إن كانت في المزرعة)',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                prefixIcon: const Icon(Icons.tag_outlined),
+            Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).brightness == Brightness.dark 
+                    ? Colors.white.withOpacity(0.05) 
+                    : Colors.grey.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.withOpacity(0.2)),
               ),
-              onChanged: (_) => setState(() {}),
-            ),
-
-            if (_motherIdController.text.isNotEmpty || _selectedMotherColorValue != null) ...[
-              const SizedBox(height: 12),
-              const Text('لون كرت الأم:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: availableColors.map((colorVal) {
-                  final color = Color(colorVal);
-                  final isSelected = _selectedMotherColorValue == colorVal;
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedMotherColorValue = colorVal),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: isSelected ? 40 : 32,
-                      height: isSelected ? 40 : 32,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        border: isSelected ? Border.all(color: Colors.white, width: 2.5) : null,
-                        boxShadow: isSelected ? [BoxShadow(color: color.withOpacity(0.4), blurRadius: 6)] : null,
+              child: Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  title: _buildSectionTitle('معلومات الأنساب (اختياري)', Icons.family_restroom),
+                  childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  children: [
+                    TextFormField(
+                      controller: _motherIdController,
+                      textAlign: TextAlign.right,
+                      decoration: InputDecoration(
+                        labelText: 'رقم/اسم الأم (إن وجدت)',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        prefixIcon: const Icon(Icons.tag_outlined),
+                        filled: true,
+                        fillColor: Theme.of(context).scaffoldBackgroundColor,
                       ),
+                      onChanged: (v) => setState(() {}),
                     ),
-                  );
-                }).toList(),
+                    if (_motherIdController.text.isNotEmpty || _selectedMotherColorValue != null) ...[
+                      const SizedBox(height: 12),
+                      const Align(
+                        alignment: Alignment.centerRight,
+                        child: Text('لون كرت الأم:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: availableColors.map((colorVal) {
+                            final color = Color(colorVal);
+                            final isSelected = _selectedMotherColorValue == colorVal;
+                            return GestureDetector(
+                              onTap: () => setState(() => _selectedMotherColorValue = colorVal),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                width: isSelected ? 40 : 32,
+                                height: isSelected ? 40 : 32,
+                                decoration: BoxDecoration(
+                                  color: color,
+                                  shape: BoxShape.circle,
+                                  border: isSelected ? Border.all(color: Colors.white, width: 2.5) : null,
+                                  boxShadow: isSelected ? [BoxShadow(color: color.withOpacity(0.4), blurRadius: 6)] : null,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ],
+            ),
 
             const SizedBox(height: 24),
             const Divider(),
