@@ -49,6 +49,16 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  Future<void> signInAnonymously() async {
+    state = const AsyncValue.loading();
+    try {
+      await _authService.signInAnonymously();
+      state = const AsyncValue.data(null);
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+    }
+  }
+
   Future<void> signOut() async {
     state = const AsyncValue.loading();
     try {

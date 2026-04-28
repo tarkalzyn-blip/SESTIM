@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cow_pregnancy/models/cow_model.dart';
 import 'package:cow_pregnancy/providers/cow_provider.dart';
-import 'package:intl/intl.dart';
 import 'package:cow_pregnancy/widgets/custom_date_picker.dart';
-import 'package:cow_pregnancy/screens/settings_screen.dart';
+import 'package:cow_pregnancy/providers/settings_provider.dart';
+import 'package:intl/intl.dart';
 
 enum CowFormState { pregnant, heat, postBirth }
 
@@ -18,38 +18,31 @@ class AddEditCowScreen extends ConsumerStatefulWidget {
 
 class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
   final _formKey = GlobalKey<FormState>();
-
   late TextEditingController _idController;
   late TextEditingController _bullIdController;
   late TextEditingController _motherIdController;
 
   CowFormState _currentState = CowFormState.pregnant;
   DateTime _selectedDate = DateTime.now();
-  int _selectedColorValue = Colors.blue.toARGB32();
+  DateTime? _dateOfBirth;
+  DateTime? _lastBirthDate; // تاريخ آخر ولادة (للبقرات الوالدات)
+  int _selectedColorValue = 0;
   int? _selectedMotherColorValue;
 
-  final List<Color> _colors = [
-    Colors.blue,
-    Colors.red,
-    Colors.green,
-    Colors.orange,
-    Colors.purple,
-    Colors.teal,
-    Colors.pink,
-    Colors.brown,
-  ];
+  bool get _isEditing => widget.cow != null;
 
   @override
   void initState() {
     super.initState();
     _idController = TextEditingController(text: widget.cow?.id ?? '');
     _bullIdController = TextEditingController(text: widget.cow?.bullId ?? '');
-    _motherIdController = TextEditingController(
-      text: widget.cow?.motherId ?? '',
-    );
+    _motherIdController = TextEditingController(text: widget.cow?.motherId ?? '');
     _selectedMotherColorValue = widget.cow?.motherColorValue;
 
+    final colors = ref.read(cowColorsProvider);
     if (widget.cow != null) {
+      _selectedColorValue = widget.cow!.colorValue;
+      _dateOfBirth = widget.cow!.dateOfBirth;
       if (widget.cow!.isPostBirth) {
         _currentState = CowFormState.postBirth;
         _selectedDate = widget.cow!.birthDate!;
@@ -60,7 +53,19 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
         _currentState = CowFormState.heat;
         _selectedDate = widget.cow!.inseminationDate;
       }
-      _selectedColorValue = widget.cow!.colorValue;
+      // استخراج تاريخ آخر ولادة من السجل
+      final birthEvents = widget.cow!.history.where((e) {
+        final t = e['title']?.toString() ?? '';
+        return t.contains('ولادة') && !t.contains('سابقة');
+      }).toList();
+      if (birthEvents.isNotEmpty) {
+        try {
+          birthEvents.sort((a, b) => DateTime.parse(b['date']).compareTo(DateTime.parse(a['date'])));
+          _lastBirthDate = DateTime.parse(birthEvents.first['date']);
+        } catch (_) {}
+      }
+    } else {
+      _selectedColorValue = colors.isNotEmpty ? colors.first : Colors.blue.toARGB32();
     }
   }
 
@@ -72,403 +77,478 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
     super.dispose();
   }
 
-  void _save() {
-    if (_formKey.currentState!.validate()) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(widget.cow == null ? 'تأكيد الإضافة' : 'تأكيد التعديل', style: const TextStyle(fontWeight: FontWeight.bold)),
-          content: Text(widget.cow == null ? 'هل أنت متأكد من إضافة هذه البقرة الجديدة؟' : 'هل أنت متأكد من حفظ التعديلات على هذه البقرة؟'),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx), 
-              child: const Text('إلغاء', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.blue,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () {
-                Navigator.pop(ctx);
-                _processSave();
-              },
-              child: const Text('حفظ', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-      );
+  /// بناء نص السياق الذكي للتلقيح
+  String _buildInseminationNote() {
+    final cow = widget.cow;
+    final List<String> parts = [];
+
+    // 1. هل هي بكيرة (وصلت لصفحة الأبقار من العجول ولم تلد بعد)؟
+    bool isHeifer = cow != null && !cow.hasGivenBirth && !cow.isStandaloneCalf;
+
+    // 2. هل وُلدت مؤخراً (آخر ولادة موجودة في السجل)؟
+    DateTime? lastBirth = _lastBirthDate;
+    if (lastBirth == null && cow != null) {
+      final births = cow.history.where((e) {
+        final t = e['title']?.toString() ?? '';
+        return t.contains('ولادة') && !t.contains('سابقة');
+      }).toList();
+      if (births.isNotEmpty) {
+        try {
+          births.sort((a, b) => DateTime.parse(b['date']).compareTo(DateTime.parse(a['date'])));
+          lastBirth = DateTime.parse(births.first['date']);
+        } catch (_) {}
+      }
     }
+
+    if (lastBirth != null) {
+      final daysSinceBirth = _selectedDate.difference(lastBirth).inDays;
+      parts.add('تم التلقيح بعد الولادة بـ $daysSinceBirth يوم');
+    }
+
+    // 3. إذا بكيرة - احسب عمرها عند التلقيح
+    if (isHeifer && _dateOfBirth != null) {
+      final ageAtInsem = _selectedDate.difference(_dateOfBirth!).inDays;
+      final years = ageAtInsem ~/ 365;
+      final months = (ageAtInsem % 365) ~/ 30;
+      final days = ageAtInsem % 30;
+      String ageStr = '';
+      if (years > 0) ageStr += '$years سنة';
+      if (months > 0) ageStr += ' و $months شهر';
+      if (days > 0 && years == 0) ageStr += ' و $days يوم';
+      parts.add('عمر البكيرة عند التلقيح: $ageStr');
+    } else if (!isHeifer && _dateOfBirth != null && lastBirth == null) {
+      // بقرة عادية لا نعرف تاريخ ولادتها الأخيرة
+      final ageAtInsem = _selectedDate.difference(_dateOfBirth!).inDays;
+      final years = ageAtInsem ~/ 365;
+      final months = (ageAtInsem % 365) ~/ 30;
+      String ageStr = '';
+      if (years > 0) ageStr += '$years سنة';
+      if (months > 0) ageStr += ' و $months شهر';
+      if (ageStr.isNotEmpty) parts.add('عمر البقرة عند التلقيح: $ageStr');
+    }
+
+    // 4. تاريخ التلقيح دائماً
+    parts.add('تاريخ التلقيح: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}');
+
+    if (_bullIdController.text.trim().isNotEmpty) {
+      parts.add('رقم العجل: ${_bullIdController.text.trim()}');
+    }
+
+    return parts.join(' | ');
+  }
+
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(_isEditing ? 'تأكيد التعديل' : 'تأكيد الإضافة',
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: Text(_isEditing
+            ? 'هل أنت متأكد من حفظ التعديلات؟'
+            : 'هل أنت متأكد من إضافة هذه البقرة؟'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء', style: TextStyle(color: Colors.grey)),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _processSave();
+            },
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _processSave() {
     bool isInseminated = _currentState == CowFormState.pregnant;
-      DateTime inseminationDate = _selectedDate;
-      DateTime? birthDate;
+    DateTime inseminationDate = _selectedDate;
+    DateTime? birthDate;
 
-      if (_currentState == CowFormState.postBirth) {
-        birthDate = _selectedDate;
-        inseminationDate = _selectedDate.subtract(const Duration(days: 280));
-        isInseminated = false;
-      } else if (_currentState == CowFormState.heat) {
-        isInseminated = false;
-      }
-
-      List<dynamic> history = widget.cow?.history.toList() ?? [];
-      if (widget.cow == null ||
-          widget.cow!.inseminationDate != inseminationDate ||
-          widget.cow!.birthDate != birthDate) {
-        String title = '';
-        if (_currentState == CowFormState.pregnant) title = 'تسجيل تلقيح';
-        if (_currentState == CowFormState.heat) title = 'تسجيل شبق';
-        if (_currentState == CowFormState.postBirth) title = 'تسجيل ولادة';
-
-        history.add({
-          'title': title,
-          'date': _selectedDate.toIso8601String(),
-          'note':
-              _currentState == CowFormState.pregnant &&
-                  _bullIdController.text.isNotEmpty
-              ? 'رقم العجل: ${_bullIdController.text}'
-              : '',
-        });
-      }
-
-      final cow = Cow(
-        id: _idController.text,
-        inseminationDate: inseminationDate,
-        colorValue: _selectedColorValue,
-        isInseminated: isInseminated,
-        birthDate: birthDate,
-        bullId: _bullIdController.text.isEmpty ? null : _bullIdController.text,
-        motherId: _motherIdController.text.isEmpty
-            ? null
-            : _motherIdController.text,
-        motherColorValue: _selectedMotherColorValue,
-        history: history,
-      );
-
-      final cows = ref.read(cowProvider);
-
-      if (widget.cow == null) {
-        // Checking for duplicate uniqueKey (ID + Color)
-        final alreadyExists = cows.any((c) => c.uniqueKey == cow.uniqueKey);
-        if (alreadyExists) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'هذا الرقم موجود مسبقاً بنفس لون الكرت!',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
-        }
-        ref.read(cowProvider.notifier).addCow(cow);
-      } else {
-        // Checking for duplicate uniqueKey if ID or Color changed
-        if (widget.cow!.uniqueKey != cow.uniqueKey) {
-          final alreadyExists = cows.any((c) => c.uniqueKey == cow.uniqueKey);
-          if (alreadyExists) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'الرقم واللون الجديد موجودين مسبقاً لبقرة أخرى!',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                backgroundColor: Colors.red,
-              ),
-            );
-            return;
-          }
-        }
-        ref
-            .read(cowProvider.notifier)
-            .updateCow(cow, oldKey: widget.cow!.uniqueKey);
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'تم الحفظ بنجاح',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          backgroundColor: Colors.green,
-          margin: const EdgeInsets.all(16),
-        ),
-      );
-      Navigator.pop(context);
-  }
-
-  Widget _buildAnimatedItem(Widget child, int delay) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0, end: 1),
-      duration: Duration(milliseconds: 400 + delay),
-      curve: Curves.easeOutCubic,
-      builder: (context, value, childWidget) {
-        return Opacity(
-          opacity: value.clamp(0.0, 1.0),
-          child: Transform.translate(
-            offset: Offset(0, 20 * (1 - value)),
-            child: childWidget,
-          ),
-        );
-      },
-      child: child,
-    );
-  }
-
-  String _getDateLabel() {
-    switch (_currentState) {
-      case CowFormState.pregnant:
-        return 'تاريخ التلقيح';
-      case CowFormState.heat:
-        return 'تاريخ آخر شبق';
-      case CowFormState.postBirth:
-        return 'تاريخ الولادة';
+    if (_currentState == CowFormState.postBirth) {
+      birthDate = _selectedDate;
+      inseminationDate = _selectedDate.subtract(const Duration(days: 280));
+      isInseminated = false;
+    } else if (_currentState == CowFormState.heat) {
+      isInseminated = false;
     }
+
+    List<dynamic> history = widget.cow?.history.toList() ?? [];
+
+    // تسجيل الحدث بنص سياق ذكي
+    if (!_isEditing ||
+        widget.cow!.inseminationDate != inseminationDate ||
+        widget.cow!.birthDate != birthDate) {
+      String title = '';
+      String note = '';
+
+      if (_currentState == CowFormState.pregnant) {
+        title = 'تسجيل تلقيح';
+        note = _buildInseminationNote();
+      } else if (_currentState == CowFormState.heat) {
+        title = 'تسجيل شبق';
+        note = 'تاريخ آخر شبق: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}';
+      } else if (_currentState == CowFormState.postBirth) {
+        title = 'تسجيل ولادة';
+        note = 'تاريخ الولادة: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}';
+      }
+
+      history.add({
+        'title': title,
+        'date': _selectedDate.toIso8601String(),
+        'note': note,
+      });
+    }
+
+    // أي بقرة تُضاف من صفحة الأبقار → تُعتبر بقرة والدة
+    bool alreadyHasBirth = history.any((e) {
+      final t = e['title']?.toString() ?? '';
+      return t.contains('ولادة') || t.contains('مولود');
+    });
+    if (!_isEditing && !alreadyHasBirth) {
+      history.add({
+        'title': 'ولادة سابقة (خارج النظام)',
+        'date': (_dateOfBirth ?? DateTime.now()).subtract(const Duration(days: 30)).toIso8601String(),
+        'note': 'تم تسجيل البقرة كوالدة سابقاً عند الإضافة من صفحة الأبقار',
+      });
+    }
+
+    final cow = Cow(
+      id: _idController.text.trim(),
+      inseminationDate: inseminationDate,
+      colorValue: _selectedColorValue,
+      isInseminated: isInseminated,
+      birthDate: birthDate,
+      bullId: _bullIdController.text.trim().isEmpty ? null : _bullIdController.text.trim(),
+      motherId: _motherIdController.text.trim().isEmpty ? null : _motherIdController.text.trim(),
+      motherColorValue: _selectedMotherColorValue,
+      dateOfBirth: _dateOfBirth,
+      history: history,
+      isStandaloneCalf: false,
+    );
+
+    final cows = ref.read(cowProvider);
+    if (!_isEditing) {
+      if (cows.any((c) => c.uniqueKey == cow.uniqueKey)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('هذا الرقم موجود مسبقاً!'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+      ref.read(cowProvider.notifier).addCow(cow);
+    } else {
+      if (widget.cow!.uniqueKey != cow.uniqueKey &&
+          cows.any((c) => c.uniqueKey == cow.uniqueKey)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('الرقم واللون موجودان مسبقاً!'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+      ref.read(cowProvider.notifier).updateCow(cow, oldKey: widget.cow!.uniqueKey);
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم الحفظ بنجاح ✓'), backgroundColor: Colors.green),
+    );
+    Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
+    final availableColors = ref.watch(cowColorsProvider);
+    if (_selectedColorValue == 0 && availableColors.isNotEmpty) {
+      _selectedColorValue = availableColors.first;
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.cow == null ? 'إضافة بقرة جديدة' : 'تعديل بقرة'),
-        leadingWidth: 100,
-        leading: Row(
+        title: Text(
+          _isEditing ? 'تعديل بيانات البقرة' : 'إضافة بقرة جديدة',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(20),
           children: [
-            const BackButton(),
-            IconButton(
-              icon: const Icon(Icons.settings),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+
+            // ── معلومات الهوية ─────────────────────────────────────────
+            _buildSectionTitle('هوية البقرة', Icons.tag),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              controller: _idController,
+              decoration: InputDecoration(
+                labelText: 'رقم/اسم البقرة *',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                prefixIcon: const Icon(Icons.tag),
+              ),
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'هذا الحقل مطلوب' : null,
+            ),
+
+            const SizedBox(height: 16),
+
+            CustomDatePickerField(
+              label: 'تاريخ ميلاد البقرة (اختياري)',
+              initialDate: _dateOfBirth ?? DateTime.now().subtract(const Duration(days: 730)),
+              onDateSelected: (date) => setState(() => _dateOfBirth = date),
+            ),
+
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 16),
+
+            // ── الحالة الحالية ─────────────────────────────────────────
+            _buildSectionTitle('الحالة الحالية', Icons.info_outline),
+            const SizedBox(height: 16),
+
+            Row(
+              children: [
+                Expanded(child: _buildStateCard(
+                  label: 'تم التلقيح',
+                  icon: '💉',
+                  value: CowFormState.pregnant,
+                  color: Colors.blue,
+                )),
+                const SizedBox(width: 8),
+                Expanded(child: _buildStateCard(
+                  label: 'انتظار الشبق',
+                  icon: '⏳',
+                  value: CowFormState.heat,
+                  color: Colors.orange,
+                )),
+                const SizedBox(width: 8),
+                Expanded(child: _buildStateCard(
+                  label: 'بعد الولادة',
+                  icon: '🍼',
+                  value: CowFormState.postBirth,
+                  color: Colors.teal,
+                )),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            // التاريخ المناسب لكل حالة
+            CustomDatePickerField(
+              label: _currentState == CowFormState.pregnant
+                  ? 'تاريخ التلقيح'
+                  : _currentState == CowFormState.heat
+                      ? 'تاريخ آخر شبق'
+                      : 'تاريخ الولادة',
+              initialDate: _selectedDate,
+              onDateSelected: (date) => setState(() => _selectedDate = date),
+            ),
+
+            if (_currentState == CowFormState.pregnant) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _bullIdController,
+                decoration: InputDecoration(
+                  labelText: 'رقم الثور/العجل (اختياري)',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Icons.pets),
+                ),
+                onChanged: (_) => setState(() {}), // تحديث نص المعاينة
+              ),
+              const SizedBox(height: 12),
+              // معاينة نص التسجيل الذكي
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.auto_awesome, color: Colors.blue, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('سيُسجَّل في السجل:', style: TextStyle(fontSize: 11, color: Colors.blue, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 4),
+                          Text(
+                            _buildInseminationNote(),
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 16),
+
+            // ── الأنساب ────────────────────────────────────────────────
+            _buildSectionTitle('معلومات الأنساب (اختياري)', Icons.family_restroom),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              controller: _motherIdController,
+              decoration: InputDecoration(
+                labelText: 'رقم الأم (إن كانت في المزرعة)',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                prefixIcon: const Icon(Icons.tag_outlined),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+
+            if (_motherIdController.text.isNotEmpty || _selectedMotherColorValue != null) ...[
+              const SizedBox(height: 12),
+              const Text('لون كرت الأم:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: availableColors.map((colorVal) {
+                  final color = Color(colorVal);
+                  final isSelected = _selectedMotherColorValue == colorVal;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedMotherColorValue = colorVal),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: isSelected ? 40 : 32,
+                      height: isSelected ? 40 : 32,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                        border: isSelected ? Border.all(color: Colors.white, width: 2.5) : null,
+                        boxShadow: isSelected ? [BoxShadow(color: color.withOpacity(0.4), blurRadius: 6)] : null,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 16),
+
+            // ── لون الكرت ──────────────────────────────────────────────
+            _buildSectionTitle('لون الكرت المميز', Icons.palette_outlined),
+            const SizedBox(height: 16),
+
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: availableColors.map((colorVal) {
+                final color = Color(colorVal);
+                final isSelected = _selectedColorValue == colorVal;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedColorValue = colorVal),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: isSelected ? 50 : 40,
+                    height: isSelected ? 50 : 40,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
+                      boxShadow: isSelected
+                          ? [BoxShadow(color: color.withOpacity(0.5), blurRadius: 10, spreadRadius: 2)]
+                          : null,
+                    ),
+                    child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 22) : null,
+                  ),
+                );
+              }).toList(),
+            ),
+
+            const SizedBox(height: 40),
+
+            // ── زر الحفظ ──────────────────────────────────────────────
+            SizedBox(
+              height: 56,
+              child: FilledButton.icon(
+                onPressed: _save,
+                icon: const Icon(Icons.check_circle_outline),
+                label: Text(
+                  _isEditing ? 'حفظ التعديلات' : 'إضافة البقرة',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStateCard({
+    required String label,
+    required String icon,
+    required CowFormState value,
+    required Color color,
+  }) {
+    final isSelected = _currentState == value;
+    return GestureDetector(
+      onTap: () => setState(() => _currentState = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.12) : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? color : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Text(icon, style: const TextStyle(fontSize: 22)),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? color : Colors.grey.shade600,
+              ),
             ),
           ],
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildAnimatedItem(
-                TextFormField(
-                  controller: _idController,
-                  decoration: InputDecoration(
-                    labelText: 'رقم/اسم البقرة',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    prefixIcon: const Icon(Icons.tag),
-                  ),
-                  validator: (val) =>
-                      val == null || val.isEmpty ? 'مطلوب' : null,
-                ),
-                0,
-              ),
-              const SizedBox(height: 20),
-              _buildAnimatedItem(
-                DropdownButtonFormField<CowFormState>(
-                  initialValue: _currentState,
-                  decoration: InputDecoration(
-                    labelText: 'حالة البقرة الحالية',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    prefixIcon: const Icon(Icons.info_outline),
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: CowFormState.pregnant,
-                      child: Text('حامل (تم التلقيح)'),
-                    ),
-                    DropdownMenuItem(
-                      value: CowFormState.heat,
-                      child: Text('انتظار الشبق (غير ملقحة)'),
-                    ),
-                    DropdownMenuItem(
-                      value: CowFormState.postBirth,
-                      child: Text('حديثة الولادة (التعافي)'),
-                    ),
-                  ],
-                  onChanged: (val) => setState(() => _currentState = val!),
-                ),
-                50,
-              ),
-              const SizedBox(height: 20),
-              _buildAnimatedItem(
-                CustomDatePickerField(
-                  label: _getDateLabel(),
-                  initialDate: _selectedDate,
-                  onDateSelected: (date) =>
-                      setState(() => _selectedDate = date),
-                ),
-                100,
-              ),
-              if (_currentState == CowFormState.pregnant) ...[
-                const SizedBox(height: 20),
-                _buildAnimatedItem(
-                  TextFormField(
-                    controller: _bullIdController,
-                    decoration: InputDecoration(
-                      labelText: 'رقم العجل (اختياري)',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      prefixIcon: const Icon(Icons.pets),
-                    ),
-                  ),
-                  150,
-                ),
-              ],
-              const SizedBox(height: 30),
-              const Divider(),
-              const SizedBox(height: 20),
-              _buildAnimatedItem(
-                const Text(
-                  'معلومات الأنساب (اختياري)',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                    color: Colors.blueGrey,
-                  ),
-                ),
-                170,
-              ),
-              const SizedBox(height: 16),
-              _buildAnimatedItem(
-                TextFormField(
-                  controller: _motherIdController,
-                  decoration: InputDecoration(
-                    labelText: 'رقم الأم (إذا كانت في المزرعة)',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    prefixIcon: const Icon(Icons.family_restroom),
-                  ),
-                ),
-                180,
-              ),
-              const SizedBox(height: 16),
-              if (_motherIdController.text.isNotEmpty ||
-                  _selectedMotherColorValue != null) ...[
-                _buildAnimatedItem(
-                  const Text(
-                    'لون كرت الأم:',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  190,
-                ),
-                const SizedBox(height: 8),
-                _buildAnimatedItem(
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: _colors.map((color) {
-                      bool isSelected =
-                          _selectedMotherColorValue == color.toARGB32();
-                      return GestureDetector(
-                        onTap: () => setState(
-                          () => _selectedMotherColorValue = color.toARGB32(),
-                        ),
-                        child: Container(
-                          width: 35,
-                          height: 35,
-                          decoration: BoxDecoration(
-                            color: color.withValues(alpha: 0.5),
-                            shape: BoxShape.circle,
-                            border: isSelected
-                                ? Border.all(color: Colors.black, width: 2)
-                                : null,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  200,
-                ),
-                const SizedBox(height: 30),
-              ],
-              const Divider(),
-              const SizedBox(height: 20),
-              _buildAnimatedItem(
-                const Text(
-                  'اللون المميز للبقرة:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                250,
-              ),
-              const SizedBox(height: 12),
-              _buildAnimatedItem(
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: _colors.map((color) {
-                    bool isSelected = _selectedColorValue == color.toARGB32();
-                    return GestureDetector(
-                      onTap: () => setState(
-                        () => _selectedColorValue = color.toARGB32(),
-                      ),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: isSelected ? 48 : 40,
-                        height: isSelected ? 48 : 40,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          boxShadow: isSelected
-                              ? [
-                                  BoxShadow(
-                                    color: color.withValues(alpha: 0.6),
-                                    blurRadius: 10,
-                                    spreadRadius: 2,
-                                  ),
-                                ]
-                              : [],
-                          border: isSelected
-                              ? Border.all(color: Colors.white, width: 3)
-                              : null,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                300,
-              ),
-              const SizedBox(height: 40),
-              _buildAnimatedItem(
-                SizedBox(
-                  width: double.infinity,
-                  height: 55,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    onPressed: _save,
-                    child: const Text(
-                      'حفظ البيانات',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                400,
-              ),
-            ],
+    );
+  }
+
+  Widget _buildSectionTitle(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: Colors.blueGrey),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.blueGrey,
           ),
         ),
-      ),
+      ],
     );
   }
 }

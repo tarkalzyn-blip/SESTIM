@@ -11,6 +11,7 @@ import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
 import 'package:cow_pregnancy/screens/settings_screen.dart';
 import 'package:cow_pregnancy/widgets/animated_action_card.dart';
 import 'package:cow_pregnancy/providers/edit_access_provider.dart';
+import 'package:collection/collection.dart';
 
 class CowDetailScreen extends ConsumerWidget {
   final Cow cow;
@@ -21,10 +22,9 @@ class CowDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cows = ref.watch(cowProvider);
     // الحصول على أحدث بيانات لهذه البقرة من المزود لضمان التحديث التلقائي
-    final currentCow = cows.firstWhere(
+    final currentCow = cows.firstWhereOrNull(
       (c) => c.uniqueKey == cow.uniqueKey,
-      orElse: () => cow,
-    );
+    ) ?? cow;
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -36,9 +36,10 @@ class CowDetailScreen extends ConsumerWidget {
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 250,
+            expandedHeight: 300,
             pinned: true,
             leadingWidth: 100,
+            backgroundColor: currentCow.color,
             leading: Row(
               children: [
                 const BackButton(color: Colors.white),
@@ -50,53 +51,39 @@ class CowDetailScreen extends ConsumerWidget {
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.edit, color: Colors.white),
-                tooltip: 'تعديل بيانات البقرة',
+                icon: const Icon(Icons.edit_outlined, color: Colors.white),
+                tooltip: 'تعديل',
                 onPressed: () {
                   ref.read(editAccessProvider.notifier).runWithAccess(context, () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => AddEditCowScreen(cow: currentCow),
-                      ),
-                    );
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => AddEditCowScreen(cow: currentCow),
+                    ));
                   });
                 },
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline, color: Colors.white),
-                tooltip: 'حذف البقرة',
+                tooltip: 'حذف',
                 onPressed: () {
                   ref.read(editAccessProvider.notifier).runWithAccess(context, () async {
                     final confirm = await showDialog<bool>(
                       context: context,
                       builder: (ctx) => AlertDialog(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         title: const Text('حذف البقرة'),
-                        content: Text(
-                          'هل أنت متأكد من حذف البقرة رقم ${currentCow.id}؟ لا يمكن التراجع عن هذا.',
-                        ),
+                        content: Text('هل أنت متأكد من حذف البقرة رقم ${currentCow.id}؟ لا يمكن التراجع.'),
                         actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text('إلغاء'),
-                          ),
-                          TextButton(
+                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+                          FilledButton(
+                            style: FilledButton.styleFrom(backgroundColor: Colors.red),
                             onPressed: () => Navigator.pop(ctx, true),
-                            child: const Text(
-                              'حذف',
-                              style: TextStyle(
-                                color: Colors.red,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            child: const Text('حذف'),
                           ),
                         ],
                       ),
                     );
                     if (confirm == true) {
-                      ref
-                          .read(cowProvider.notifier)
-                          .deleteCow(currentCow.uniqueKey);
+                      ref.read(cowProvider.notifier).deleteCow(currentCow.uniqueKey);
                       if (context.mounted) Navigator.pop(context);
                     }
                   });
@@ -104,179 +91,125 @@ class CowDetailScreen extends ConsumerWidget {
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
-              title: CowIdBadge(
-                id: currentCow.id,
-                color: Colors.white,
-                fontSize: 16,
-                boxSize: 14,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              ),
+              collapseMode: CollapseMode.parallax,
               background: Hero(
                 tag: 'cow_card_${currentCow.uniqueKey}',
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        currentCow.color,
-                        currentCow.color.withValues(alpha: 0.6),
-                      ],
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // خلفية بتدرج غني
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            currentCow.color,
+                            currentCow.color.withOpacity(0.5),
+                            currentCow.color.withOpacity(0.8),
+                          ],
+                          stops: const [0.0, 0.5, 1.0],
+                        ),
+                      ),
                     ),
-                  ),
+                    // دوائر زخرفية
+                    Positioned(
+                      top: -40, left: -40,
+                      child: Container(
+                        width: 180, height: 180,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.07),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 20, right: -30,
+                      child: Container(
+                        width: 120, height: 120,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.05),
+                        ),
+                      ),
+                    ),
+                    // المحتوى
+                    Positioned(
+                      bottom: 20, left: 20, right: 20,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CowIdBadge(
+                            id: currentCow.id,
+                            color: Colors.white,
+                            fontSize: 22,
+                            boxSize: 18,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              _headerChip(Icons.circle, currentCow.status.split('(').first.trim(), Colors.white),
+                              const SizedBox(width: 8),
+                              if (currentCow.age != 'غير محدد')
+                                _headerChip(Icons.cake_outlined, currentCow.age, Colors.white),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(20.0),
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // صندوق المتبقي / منذ الولادة (نفس التصميم في الكرت)
+                  // ── البطاقة الرئيسية (متبقي/منذ الولادة) ────────────────
                   _buildMainRemainingBox(context, currentCow),
-                  const SizedBox(height: 24),
-
-                  if (currentCow.isPostBirth) ...[
-                    _buildDetailRow(
-                      'تاريخ الولادة',
-                      DateFormat('yyyy-MM-dd').format(currentCow.birthDate!),
-                      Icons.child_care,
-                      subTextColor: subTextColor,
-                      textColor: textColor,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildDetailRow(
-                      'أيام منذ الولادة',
-                      '${currentCow.daysSinceBirth} يوم',
-                      Icons.timer,
-                      subTextColor: subTextColor,
-                      textColor: textColor,
-                    ),
-                  ] else ...[
-                    _buildDetailRow(
-                      currentCow.isInseminated
-                          ? 'تاريخ التلقيح'
-                          : 'تاريخ آخر شبق',
-                      DateFormat(
-                        'yyyy-MM-dd',
-                      ).format(currentCow.inseminationDate),
-                      Icons.calendar_today,
-                      subTextColor: subTextColor,
-                      textColor: textColor,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildDetailRow(
-                      'الأيام المنقضية',
-                      '${currentCow.daysSinceInsemination} يوم',
-                      Icons.timer,
-                      subTextColor: subTextColor,
-                      textColor: textColor,
-                    ),
-
-                    // تنبيه تجاوز موعد الولادة
-                    if (!currentCow.isPostBirth &&
-                        currentCow.isInseminated &&
-                        currentCow.daysSinceInsemination > 280) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.red.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.warning_amber_rounded,
-                              color: Colors.red,
-                              size: 28,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'تنبيه: تجاوز موعد الولادة',
-                                    style: TextStyle(
-                                      color: Colors.red,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  Text(
-                                    'تجاوزت البقرة موعد الولادة المفترض بـ ${currentCow.daysSinceInsemination - 280} يوم.',
-                                    style: TextStyle(
-                                      color: Colors.red.withValues(alpha: 0.8),
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                  if (currentCow.bullId != null &&
-                      currentCow.bullId!.isNotEmpty) ...[
-                    const SizedBox(height: 20),
-                    _buildDetailRow(
-                      'رقم العجل',
-                      currentCow.bullId!,
-                      Icons.pets,
-                      color: Colors.blueGrey,
-                      subTextColor: subTextColor,
-                    ),
-                  ],
-                  if (currentCow.motherId != null &&
-                      currentCow.motherId!.isNotEmpty) ...[
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.family_restroom,
-                          color: Colors.blueGrey,
-                          size: 28,
-                        ),
-                        const SizedBox(width: 16),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'رقم الأم',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: subTextColor,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            CowIdBadge(
-                              id: currentCow.motherId!,
-                              color: currentCow.motherColorValue != null
-                                  ? Color(currentCow.motherColorValue!)
-                                  : Colors.blueGrey,
-                              fontSize: 16,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
                   const SizedBox(height: 20),
-                  _buildDetailRow(
-                    'الحالة الحالية',
-                    currentCow.status,
-                    Icons.info_outline,
-                    color: currentCow.color,
-                    subTextColor: subTextColor,
-                  ),
+
+                  // ── بطاقة المعلومات ───────────────────────────────────────
+                  _buildInfoCard(context, currentCow, isDark, subTextColor, textColor),
+                  const SizedBox(height: 20),
+
+                  // ── تنبيه تجاوز موعد الولادة ─────────────────────────────
+                  if (!currentCow.isPostBirth &&
+                      currentCow.isInseminated &&
+                      currentCow.daysSinceInsemination > 280) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.red.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('تنبيه: تجاوز موعد الولادة',
+                                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15)),
+                                Text(
+                                  'تجاوزت موعد الولادة بـ ${currentCow.daysSinceInsemination - 280} يوم',
+                                  style: TextStyle(color: Colors.red.withOpacity(0.8), fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
                   const SizedBox(height: 40),
                   const Text(
                     'نسبة تقدم الحمل',
@@ -570,12 +503,60 @@ class CowDetailScreen extends ConsumerWidget {
                   ),
                   if (note.isNotEmpty)
                     Text(note, style: TextStyle(color: subTextColor)),
+                  
+                  // Summary chips for vaccines and weights
+                  if (event['vaccines'] != null || event['weights'] != null) ...[
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        if (event['vaccines'] != null && (event['vaccines'] as List).isNotEmpty)
+                          _buildSummaryChip(
+                            Icons.vaccines,
+                            '${(event['vaccines'] as List).length} لقاح',
+                            Colors.teal,
+                          ),
+                        if (event['weights'] != null && (event['weights'] as List).isNotEmpty)
+                          _buildSummaryChip(
+                            Icons.monitor_weight,
+                            '${(event['weights'] as List).length} وزن',
+                            Colors.blue,
+                          ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
             const Icon(Icons.more_vert, color: Colors.grey, size: 18),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryChip(IconData icon, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -677,6 +658,102 @@ class CowDetailScreen extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _headerChip(IconData icon, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 5),
+          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(BuildContext context, Cow cow, bool isDark, Color subColor, Color textColor) {
+    final items = <_InfoItem>[];
+
+    items.add(_InfoItem(Icons.timer_outlined, 'العمر الحالي', cow.age, null));
+
+    if (cow.isPostBirth) {
+      items.add(_InfoItem(Icons.child_care, 'تاريخ الولادة',
+          DateFormat('yyyy/MM/dd').format(cow.birthDate!), Colors.teal));
+      items.add(_InfoItem(Icons.hourglass_bottom, 'منذ الولادة',
+          '${cow.daysSinceBirth} يوم', Colors.teal));
+    } else {
+      items.add(_InfoItem(Icons.calendar_today,
+          cow.isInseminated ? 'تاريخ التلقيح' : 'تاريخ آخر شبق',
+          DateFormat('yyyy/MM/dd').format(cow.inseminationDate), Colors.blue));
+      items.add(_InfoItem(Icons.timer, 'الأيام المنقضية',
+          '${cow.daysSinceInsemination} يوم', Colors.blue));
+    }
+
+    if (cow.bullId != null && cow.bullId!.isNotEmpty)
+      items.add(_InfoItem(Icons.pets, 'رقم الثور', cow.bullId!, Colors.blueGrey));
+
+    if (cow.motherId != null && cow.motherId!.isNotEmpty)
+      items.add(_InfoItem(Icons.family_restroom, 'رقم الأم', cow.motherId!, Colors.blueGrey));
+
+    items.add(_InfoItem(Icons.info_outline, 'الحالة', cow.status, cow.color));
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: cow.color.withOpacity(0.15), width: 1.5),
+        boxShadow: [
+          BoxShadow(color: cow.color.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        children: items.asMap().entries.map((entry) {
+          final i = entry.key;
+          final item = entry.value;
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(9),
+                      decoration: BoxDecoration(
+                        color: (item.color ?? Colors.grey).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(item.icon, color: item.color ?? Colors.grey.shade600, size: 22),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(item.label, style: TextStyle(fontSize: 12, color: subColor, fontWeight: FontWeight.w500)),
+                          const SizedBox(height: 2),
+                          Text(item.value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
+                              color: item.color ?? textColor)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (i < items.length - 1)
+                Divider(height: 1, indent: 56, color: Colors.grey.withOpacity(0.12)),
+            ],
+          );
+        }).toList(),
       ),
     );
   }
@@ -842,7 +919,43 @@ class CowDetailScreen extends ConsumerWidget {
     WidgetRef ref,
     Cow currentCow,
   ) {
-    // التحقق من مدة الحمل الحالية (أكثر من 5 أشهر يمنع تسجيل تلقيح جديد كحماية)
+    // ── التحقق 1: حديثة الولادة ولم تمر المدة الدنيا المطلوبة ────────────
+    if (currentCow.isPostBirth) {
+      final minDays = AppSettings.minInseminationDaysAfterBirth;
+      final daysSinceBirth = currentCow.daysSinceBirth;
+      if (daysSinceBirth < minDays) {
+        final remaining = minDays - daysSinceBirth;
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.block, color: Colors.red),
+                SizedBox(width: 8),
+                Text('التلقيح مبكر جداً', style: TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: Text(
+              'مرّ على الولادة $daysSinceBirth يوم فقط.\n\n'
+              'الحد الأدنى المسموح به هو $minDays يوم.\n\n'
+              'يمكن تسجيل التلقيح بعد $remaining يوم أخرى.\n\n'
+              'يمكنك تغيير هذه المدة من: الإعدادات ← إعدادات المزرعة',
+            ),
+            actions: [
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('حسناً'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+    }
+
+    // ── التحقق 2: حمل متقدم (أكثر من 5 أشهر) ───────────────────────────
     if (currentCow.isInseminated &&
         !currentCow.isPostBirth &&
         currentCow.daysSinceInsemination > 150) {
@@ -1282,4 +1395,13 @@ class CowDetailScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// كلاس مساعد لبناء بنود بطاقة المعلومات
+class _InfoItem {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? color;
+  const _InfoItem(this.icon, this.label, this.value, this.color);
 }

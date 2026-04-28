@@ -6,6 +6,8 @@ import 'package:cow_pregnancy/widgets/custom_date_picker.dart';
 import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
 import 'package:cow_pregnancy/screens/settings_screen.dart';
 import 'package:cow_pregnancy/providers/edit_access_provider.dart';
+import 'package:uuid/uuid.dart';
+import 'package:cow_pregnancy/models/cow_model.dart';
 
 class CalfDetailScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> calfData;
@@ -23,6 +25,27 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
   void initState() {
     super.initState();
     _currentCalfData = Map.from(widget.calfData);
+  }
+
+  String get _calculateAge {
+    final birthDate = _currentCalfData['date'] as DateTime;
+    final now = DateTime.now();
+    final difference = now.difference(birthDate);
+    final days = difference.inDays;
+
+    if (days < 30) return '$days يوم';
+    if (days < 365) {
+      final months = days ~/ 30;
+      final remainingDays = days % 30;
+      String result = '$months شهر';
+      if (remainingDays > 0) result += ' و $remainingDays يوم';
+      return result;
+    }
+    final years = days ~/ 365;
+    final remainingMonths = (days % 365) ~/ 30;
+    String result = '$years سنة';
+    if (remainingMonths > 0) result += ' و $remainingMonths شهر';
+    return result;
   }
 
   void _showExitDialog() {
@@ -426,6 +449,116 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
     }
   }
 
+  void _showMoveToHerdDialog() {
+    DateTime inseminationDate = DateTime.now();
+    final bullController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          title: const Text(
+            'نقل البكيرة للقطيع',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'بمجرد تلقيح البكيرة، يجب نقلها لسجل الأبقار لمتابعة الحمل والولادة.',
+              ),
+              const SizedBox(height: 16),
+              CustomDatePickerField(
+                label: 'تاريخ التلقيح الأول',
+                initialDate: inseminationDate,
+                onDateSelected: (date) => inseminationDate = date,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: bullController,
+                decoration: InputDecoration(
+                  labelText: 'رقم العجل (الملقح)',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.orange),
+              onPressed: () {
+                _processMoveToHerd(inseminationDate, bullController.text);
+                Navigator.pop(ctx);
+                Navigator.pop(context);
+              },
+              child: const Text('نقل وتلقيح'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _processMoveToHerd(DateTime date, String bullId) {
+    final cows = ref.read(cowProvider);
+    final cowIndex = cows.indexWhere(
+      (c) => c.uniqueKey == _currentCalfData['motherUniqueKey'],
+    );
+
+    if (cowIndex != -1) {
+      final cow = cows[cowIndex];
+      final originalDate = _currentCalfData['originalEventDate'];
+      final storedEventId = _currentCalfData['eventId']?.toString();
+
+      final newHistory = cow.history.map((event) {
+        if (_matchEvent(event, storedEventId, originalDate)) {
+          final newEvent = Map<String, dynamic>.from(event);
+          newEvent['isExited'] = true;
+          newEvent['exitReason'] = 'نقل للقطيع';
+          newEvent['exitDate'] = date.toIso8601String();
+          return newEvent;
+        }
+        return event;
+      }).toList();
+
+      ref
+          .read(cowProvider.notifier)
+          .updateCow(cow.copyWith(history: newHistory));
+
+      final newCow = Cow(
+        id: _currentCalfData['calfId'] ?? 'New',
+        inseminationDate: date,
+        isInseminated: true,
+        colorValue: _currentCalfData['calfColorValue'],
+        motherId: _currentCalfData['motherId'],
+        motherColorValue: _currentCalfData['motherColorValue'],
+        dateOfBirth: _currentCalfData['date'] as DateTime,
+        history: [
+          {
+            'title': 'تلقيح أول (بكيرة)',
+            'date': date.toIso8601String(),
+            'note': 'تم النقل من سجل المواليد. رقم الملقح: $bullId',
+            'eventId': const Uuid().v4(),
+          }
+        ],
+      );
+      ref.read(cowProvider.notifier).addCow(newCow);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم نقل البكيرة للقطيع بنجاح'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isMale = _currentCalfData['note'].toString().contains('ذكر');
@@ -540,6 +673,11 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
               DateFormat('yyyy/MM/dd').format(_currentCalfData['date']),
             ),
             _buildDetailCard(
+              Icons.timer_outlined,
+              'العمر الحالي',
+              _calculateAge,
+            ),
+            _buildDetailCard(
               Icons.female,
               'رقم الأم',
               '',
@@ -617,6 +755,24 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
                 ),
               ],
             ),
+
+            if (!isExited && !isMale && DateTime.now().difference(_currentCalfData['date'] as DateTime).inDays >= 300) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: InkWell(
+                  onTap: () => ref
+                      .read(editAccessProvider.notifier)
+                      .runWithAccess(context, _showMoveToHerdDialog),
+                  borderRadius: BorderRadius.circular(15),
+                  child: _buildActionBtn(
+                    Icons.upgrade_outlined,
+                    'نقل إلى القطيع (تلقيح البكيرة)',
+                    Colors.orange,
+                  ),
+                ),
+              ),
+            ],
 
             const SizedBox(height: 20),
 

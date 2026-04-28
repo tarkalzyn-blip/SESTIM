@@ -13,6 +13,10 @@ class Cow {
   final String? motherId;
   final int? motherColorValue;
   final String? userId; // For cloud sync
+  final DateTime? dateOfBirth;
+  final bool
+  isStandaloneCalf; // New: True if it's currently managed in calves screen
+  final String? gender; // New: 'male' or 'female'
 
   Cow({
     required this.id,
@@ -25,6 +29,9 @@ class Cow {
     this.motherId,
     this.motherColorValue,
     this.userId,
+    this.dateOfBirth,
+    this.isStandaloneCalf = false,
+    this.gender,
   });
 
   Map<String, dynamic> toMap() {
@@ -39,6 +46,9 @@ class Cow {
       'motherId': motherId,
       'motherColorValue': motherColorValue,
       'userId': userId,
+      'dateOfBirth': dateOfBirth?.toIso8601String(),
+      'isStandaloneCalf': isStandaloneCalf,
+      'gender': gender,
     };
   }
 
@@ -48,12 +58,19 @@ class Cow {
       inseminationDate: DateTime.parse(map['inseminationDate']),
       colorValue: map['colorValue'] ?? 0,
       isInseminated: map['isInseminated'] ?? true,
-      birthDate: map['birthDate'] != null ? DateTime.parse(map['birthDate']) : null,
+      birthDate: map['birthDate'] != null
+          ? DateTime.parse(map['birthDate'])
+          : null,
       bullId: map['bullId'],
       history: List<dynamic>.from(map['history'] ?? []),
       motherId: map['motherId'],
       motherColorValue: map['motherColorValue'],
       userId: map['userId'],
+      dateOfBirth: map['dateOfBirth'] != null
+          ? DateTime.parse(map['dateOfBirth'])
+          : null,
+      isStandaloneCalf: map['isStandaloneCalf'] ?? false,
+      gender: map['gender'],
     );
   }
 
@@ -68,6 +85,9 @@ class Cow {
     String? motherId,
     int? motherColorValue,
     String? userId,
+    DateTime? dateOfBirth,
+    bool? isStandaloneCalf,
+    String? gender,
   }) {
     return Cow(
       id: id ?? this.id,
@@ -80,6 +100,9 @@ class Cow {
       motherId: motherId ?? this.motherId,
       motherColorValue: motherColorValue ?? this.motherColorValue,
       userId: userId ?? this.userId,
+      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      isStandaloneCalf: isStandaloneCalf ?? this.isStandaloneCalf,
+      gender: gender ?? this.gender,
     );
   }
 
@@ -88,11 +111,16 @@ class Cow {
   int get daysSinceInsemination {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final insem = DateTime(inseminationDate.year, inseminationDate.month, inseminationDate.day);
+    final insem = DateTime(
+      inseminationDate.year,
+      inseminationDate.month,
+      inseminationDate.day,
+    );
     return today.difference(insem).inDays;
   }
 
-  bool get isPostBirth => birthDate != null && birthDate!.isAfter(inseminationDate);
+  bool get isPostBirth =>
+      birthDate != null && birthDate!.isAfter(inseminationDate);
   int get daysSinceBirth {
     if (!isPostBirth) return 0;
     final now = DateTime.now();
@@ -106,7 +134,7 @@ class Cow {
       if (daysSinceBirth > AppSettings.recoveryDays) return 1.0;
       return daysSinceBirth / AppSettings.recoveryDays;
     }
-    
+
     int days = daysSinceInsemination;
     if (days < 0) return 0;
     if (!isInseminated) {
@@ -117,23 +145,91 @@ class Cow {
     return days / AppSettings.pregnancyDays;
   }
 
+  bool get hasGivenBirth => history.any((e) {
+    final title = e['title']?.toString() ?? '';
+    return title.contains('ولادة') || title.contains('مولود');
+  });
+
+  bool get isHeifer {
+    // ذكر لا يمكن أن يكون بكيرة
+    if (gender == 'male') return false;
+
+    // إذا ولدت سابقاً فهي بقرة
+    if (hasGivenBirth) return false;
+
+    // إذا كانت لا تزال عجولة مستقلة في صفحة العجول → ليست بكيرة بعد
+    if (isStandaloneCalf) return false;
+
+    // في قائمة الأبقار ولم تلد بعد → بكيرة
+    return true;
+  }
+
   String get status {
+    // العجول المستقلة (في صفحة العجول) - هذا لن يُستدعى عادةً من صفحة الأبقار
+    if (isStandaloneCalf) {
+      if (dateOfBirth != null) {
+        final ageInDays = DateTime.now().difference(dateOfBirth!).inDays;
+        if (ageInDays < 365) return gender == 'male' ? 'عجل' : 'عجولة';
+      }
+      return gender == 'male' ? 'عجل' : 'عجولة';
+    }
+
+    // البكيرة (في صفحة الأبقار لكن لم تلد)
+    if (isHeifer) {
+      if (isPostBirth) return 'بكيرة - حديثة الولادة';
+      if (isInseminated) {
+        if (daysSinceInsemination <= 25) return 'بكيرة - تحت المراقبة';
+        if (daysSinceInsemination < AppSettings.pregnancyDays - 20)
+          return 'بكيرة - حامل';
+        if (daysSinceInsemination <= AppSettings.pregnancyDays)
+          return 'بكيرة - قريبة من الولادة';
+        return 'بكيرة - تجاوزت موعد الولادة';
+      }
+      return 'بكيرة - انتظار التلقيح';
+    }
+
+    // البقرة الوالدة
     if (isPostBirth) {
-      if (daysSinceBirth < AppSettings.recoveryDays) return "حديثة الولادة (التعافي)";
-      return "⚠ تأخرت عن التلقيح";
+      if (daysSinceBirth < AppSettings.recoveryDays)
+        return 'حديثة الولادة (التعافي)';
+      return '⚠ تأخرت عن التلقيح';
     }
 
     int days = daysSinceInsemination;
     if (!isInseminated) {
-      if (days < AppSettings.heatCycleDays - 3) return "انتظار الشبق القادم";
-      if (days >= AppSettings.heatCycleDays - 3 && days <= AppSettings.heatCycleDays + 1) return "⚠ موعد شبق متوقع";
-      return "تجاوزت موعد الشبق";
+      if (days < AppSettings.heatCycleDays - 3) return 'انتظار الشبق';
+      if (days >= AppSettings.heatCycleDays - 3 &&
+          days <= AppSettings.heatCycleDays + 1)
+        return '⚠ موعد شبق متوقع';
+      return 'تجاوزت موعد الشبق';
     }
+    if (days <= 25) return 'تحت المراقبة';
+    if (days > 25 && days < AppSettings.pregnancyDays - 20) return 'حامل';
+    if (days >= AppSettings.pregnancyDays - 20 &&
+        days <= AppSettings.pregnancyDays)
+      return 'قريبة من الولادة';
+    return 'تجاوزت موعد الولادة';
+  }
 
-    if (days <= 25) return "تحت المراقبة";
-    if (days > 25 && days < AppSettings.pregnancyDays - 20) return "حامل";
-    if (days >= AppSettings.pregnancyDays - 20 && days <= AppSettings.pregnancyDays) return "قريبة من الولادة";
-    return "تجاوزت موعد الولادة";
+  String get age {
+    if (dateOfBirth == null) return "غير محدد";
+    final now = DateTime.now();
+    final difference = now.difference(dateOfBirth!);
+    final days = difference.inDays;
+
+    if (days < 30) return '$days يوم';
+    if (days < 365) {
+      final months = days ~/ 30;
+      final remainingDays = days % 30;
+      String result = '$months شهر';
+      if (remainingDays > 0) result += ' و $remainingDays يوم';
+      return result;
+    }
+    final years = days ~/ 365;
+    final remainingMonths = (days % 365) ~/ 30;
+    String result = '$years سنة';
+    if (remainingMonths > 0) result += ' و $remainingMonths شهر';
+    return result;
   }
 
   String get uniqueKey => "${id}_$colorValue";
@@ -160,13 +256,16 @@ class CowAdapter extends TypeAdapter<Cow> {
       motherId: fields[7] as String?,
       motherColorValue: fields[8] as int?,
       userId: fields[9] as String?,
+      dateOfBirth: fields[10] as DateTime?,
+      isStandaloneCalf: fields[11] as bool? ?? false,
+      gender: fields[12] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Cow obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(13) // Updated count
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -186,6 +285,12 @@ class CowAdapter extends TypeAdapter<Cow> {
       ..writeByte(8)
       ..write(obj.motherColorValue)
       ..writeByte(9)
-      ..write(obj.userId);
+      ..write(obj.userId)
+      ..writeByte(10)
+      ..write(obj.dateOfBirth)
+      ..writeByte(11)
+      ..write(obj.isStandaloneCalf)
+      ..writeByte(12)
+      ..write(obj.gender);
   }
 }

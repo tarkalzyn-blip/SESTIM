@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -60,7 +61,6 @@ class CowNotifier extends Notifier<List<Cow>> {
   bool _hasDataChanged(List<Cow> cloud, List<Cow> local) {
     if (cloud.length != local.length) return true;
     
-    // Check if any cow has a different ID or status (simple but effective check)
     for (int i = 0; i < cloud.length; i++) {
       if (cloud[i].uniqueKey != local[i].uniqueKey || 
           cloud[i].status != local[i].status ||
@@ -76,7 +76,6 @@ class CowNotifier extends Notifier<List<Cow>> {
     _subscription = null;
   }
 
-  /// يراقب الاتصال بالإنترنت ويمزامن البيانات تلقائياً عند عودته
   void _startConnectivityListener() {
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
       final isConnected = results.any((r) => r != ConnectivityResult.none);
@@ -100,16 +99,12 @@ class CowNotifier extends Notifier<List<Cow>> {
     final box = Hive.box<Cow>('cows');
     await box.put(cow.uniqueKey, cowWithUser);
     
-    // Update state IMMEDIATELY with a fresh sorted list from Hive
-    // This ensures offline additions show up instantly
     final updatedList = box.values.toList();
     state = updatedList;
     
-    // Schedule notifications in background
     NotificationService().scheduleCowNotifications(cowWithUser);
     
     if (user != null) {
-      // Sync to cloud in background without blocking UI
       _firestore.saveCow(cowWithUser).then((_) {
         ref.read(syncStatusProvider.notifier).setStatus(null);
       }).catchError((e) {
@@ -134,7 +129,6 @@ class CowNotifier extends Notifier<List<Cow>> {
     
     await box.put(cow.uniqueKey, cowWithUser);
     
-    // Refresh local state immediately
     final updatedList = box.values.toList();
     state = updatedList;
     
@@ -150,7 +144,6 @@ class CowNotifier extends Notifier<List<Cow>> {
     final box = Hive.box<Cow>('cows');
     await box.delete(uniqueKey);
     
-    // Refresh local state immediately
     state = box.values.toList();
     
     NotificationService().cancelCowNotifications(uniqueKey);
@@ -167,7 +160,6 @@ class CowNotifier extends Notifier<List<Cow>> {
         final box = Hive.box<Cow>('cows');
         final localCows = box.values.toList();
         
-        // Force update all local cows to the CURRENT user's ID to avoid permission conflicts
         for (var cow in localCows) {
           if (cow.userId != user.id) {
             final updatedCow = cow.copyWith(userId: user.id);
@@ -179,7 +171,7 @@ class CowNotifier extends Notifier<List<Cow>> {
         await _firestore.syncLocalToCloud(updatedLocalCows);
         
         ref.read(syncStatusProvider.notifier).setStatus(null);
-        state = updatedLocalCows; // Refresh UI
+        state = updatedLocalCows; 
       } catch (e) {
         debugPrint("Firestore sync failed: $e");
         ref.read(syncStatusProvider.notifier).setStatus("فشل المزامنة الشاملة: $e");
@@ -192,7 +184,7 @@ final cowProvider = NotifierProvider<CowNotifier, List<Cow>>(() {
   return CowNotifier();
 });
 
-enum CowFilter { all, pregnant, monitoring, notInseminated, postBirth }
+enum CowFilter { all, pregnant, monitoring, notInseminated, postBirth, heifer }
 enum CowSortCriteria { id, inseminationDate, birthDate }
 enum CowSortOrder { ascending, descending }
 
@@ -249,7 +241,10 @@ final filterProvider = NotifierProvider<FilterNotifier, CowFilter>(() {
 final filteredCowsProvider = Provider<List<Cow>>((ref) {
   final filter = ref.watch(filterProvider);
   final sort = ref.watch(sortProvider);
-  final cows = ref.watch(cowProvider);
+  final allCows = ref.watch(cowProvider);
+
+  // Filter out standalone calves from the cows list
+  final cows = allCows.where((c) => !c.isStandaloneCalf).toList();
 
   List<Cow> result;
 
@@ -268,6 +263,9 @@ final filteredCowsProvider = Provider<List<Cow>>((ref) {
       break;
     case CowFilter.postBirth:
       result = cows.where((c) => c.isPostBirth).toList();
+      break;
+    case CowFilter.heifer:
+      result = cows.where((c) => c.isHeifer).toList();
       break;
   }
 
@@ -300,12 +298,12 @@ final filteredCowsProvider = Provider<List<Cow>>((ref) {
   return result;
 });
 
-/// Optimized provider for extracting calves from history (Performance Fix)
 final allCalvesProvider = Provider<List<Map<String, dynamic>>>((ref) {
-  final cows = ref.watch(cowProvider);
+  final allCows = ref.watch(cowProvider);
   final List<Map<String, dynamic>> calves = [];
 
-  for (var cow in cows) {
+  for (var cow in allCows) {
+    // 1. History-based calves (traditional)
     for (var event in cow.history) {
       final title = event['title']?.toString() ?? '';
       if (title == 'تسجيل ولادة' || title == 'تسجيل ولادة سابقة') {
@@ -315,46 +313,53 @@ final allCalvesProvider = Provider<List<Map<String, dynamic>>>((ref) {
           'motherUniqueKey': cow.uniqueKey,
           'motherColor': cow.color,
           'originalEventDate': event['date'],
+          'isStandalone': false,
         });
       }
+    }
+    
+    // 2. Standalone calves
+    if (cow.isStandaloneCalf) {
+      calves.add({
+        'calfId': cow.id,
+        'calfColorValue': cow.colorValue,
+        'date': cow.dateOfBirth?.toIso8601String() ?? cow.inseminationDate.toIso8601String(),
+        'note': cow.gender == 'male' ? 'ذكر' : 'أنثى',
+        'eventId': cow.uniqueKey,
+        'motherId': cow.motherId ?? 'غير محدد',
+        'motherUniqueKey': cow.uniqueKey, // Use its own key for identification if standalone
+        'motherColor': Color(cow.motherColorValue ?? 0xFF9E9E9E),
+        'originalEventDate': cow.dateOfBirth?.toIso8601String() ?? cow.inseminationDate.toIso8601String(),
+        'isStandalone': true,
+        'uniqueKey': cow.uniqueKey,
+      });
     }
   }
   return calves;
 });
 
-/// Optimized provider for birth stats (Performance Fix)
 final birthStatsProvider = Provider<Map<String, dynamic>>((ref) {
-  final cows = ref.watch(cowProvider);
+  final calves = ref.watch(allCalvesProvider);
   
   int totalCalves = 0, maleCalves = 0, femaleCalves = 0;
   int exitedSold = 0, exitedDead = 0, exitedTransfer = 0, exitedDeleted = 0;
   
-  for (var cow in cows) {
-    for (var event in cow.history) {
-      final title = (event['title'] ?? '').toString().toLowerCase();
-      final note = (event['note'] ?? '').toString().toLowerCase();
-      final calfId = (event['calfId'] ?? '').toString().toLowerCase();
+  for (var calf in calves) {
+    if (calf['isExited'] == true) {
+      final reason = calf['exitReason'].toString().toLowerCase();
+      if (reason.contains('بيع')) exitedSold++;
+      else if (reason.contains('موت')) exitedDead++;
+      else if (reason.contains('نقل')) exitedTransfer++;
+      else exitedDeleted++;
+      continue;
+    }
 
-      if (title.contains('ولادة') || title.contains('birth') || 
-          note.contains('ولادة') || note.contains('birth') || 
-          calfId.isNotEmpty) {
-        
-        totalCalves++;
-        
-        if (note.contains('ذكر') || note.contains('عجل') || calfId.contains('ذكر') || (event['calfColorValue'] == 0xFF2196F3)) {
-          maleCalves++;
-        } else {
-          femaleCalves++;
-        }
-        
-        if (event.containsKey('exitReason')) {
-          final reason = event['exitReason'].toString().toLowerCase();
-          if (reason.contains('بيع')) exitedSold++;
-          else if (reason.contains('موت')) exitedDead++;
-          else if (reason.contains('نقل')) exitedTransfer++;
-          else exitedDeleted++;
-        }
-      }
+    totalCalves++;
+    final note = calf['note'].toString().toLowerCase();
+    if (note.contains('ذكر') || note.contains('عجل')) {
+      maleCalves++;
+    } else {
+      femaleCalves++;
     }
   }
 
@@ -366,6 +371,6 @@ final birthStatsProvider = Provider<Map<String, dynamic>>((ref) {
     'dead': exitedDead,
     'transfer': exitedTransfer,
     'deleted': exitedDeleted,
-    'active': totalCalves - (exitedSold + exitedDead + exitedTransfer + exitedDeleted),
+    'active': totalCalves,
   };
 });

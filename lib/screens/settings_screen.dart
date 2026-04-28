@@ -9,6 +9,7 @@ import 'package:cow_pregnancy/services/notification_service.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:cow_pregnancy/screens/about_screen.dart';
 import 'package:cow_pregnancy/providers/edit_access_provider.dart';
+import 'package:cow_pregnancy/providers/settings_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -58,6 +59,21 @@ class SettingsScreen extends ConsumerWidget {
                 context,
                 MaterialPageRoute(
                   builder: (_) => const AppearanceSettingsPage(),
+                ),
+              ),
+            ),
+
+            _buildSettingsTile(
+              context,
+              icon: Icons.style_outlined,
+              color: Colors.pinkAccent,
+              title: 'ألوان الكروت',
+              subtitle: 'إضافة أو حذف الألوان المميزة للبقر والعجول',
+              onTap: () => ref.read(editAccessProvider.notifier).runWithAccess(
+                context,
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CowColorsSettingsPage()),
                 ),
               ),
             ),
@@ -362,6 +378,7 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
   late TextEditingController _heat;
   late TextEditingController _late;
   late TextEditingController _dry;
+  late TextEditingController _minInsem;
 
   @override
   void initState() {
@@ -373,6 +390,9 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
     );
     _dry = TextEditingController(text: AppSettings.dryingDays.toString());
     _heat = TextEditingController(text: AppSettings.heatCycleDays.toString());
+    _minInsem = TextEditingController(
+      text: AppSettings.minInseminationDaysAfterBirth.toString(),
+    );
   }
 
   @override
@@ -382,6 +402,7 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
     _late.dispose();
     _dry.dispose();
     _heat.dispose();
+    _minInsem.dispose();
     super.dispose();
   }
 
@@ -393,7 +414,14 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
         padding: const EdgeInsets.all(16),
         children: [
           _buildInput('مدة الحمل (يوم)', _preg, Icons.calendar_month),
-          _buildInput('بداية الجاهزية للتلقيح (يوم)', _rec, Icons.child_care),
+          _buildInput('بداية الجاهزية للتلقيح بعد الولادة (يوم)', _rec, Icons.child_care),
+          _buildInput(
+            'الحد الأدنى للتلقيح بعد الولادة (يوم)',
+            _minInsem,
+            Icons.block,
+            hint: 'لن يُسمح بتسجيل التلقيح قبل هذه المدة من الولادة',
+            color: Colors.red,
+          ),
           _buildInput('تأخر في التلقيح (يوم)', _late, Icons.warning_amber),
           _buildInput(
             'بداية فترة التجفيف قبل الولادة (يوم)',
@@ -408,6 +436,9 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
                 int.tryParse(_preg.text) ?? 280,
               );
               await AppSettings.setRecoveryDays(int.tryParse(_rec.text) ?? 60);
+              await AppSettings.setMinInseminationDaysAfterBirth(
+                int.tryParse(_minInsem.text) ?? 45,
+              );
               await AppSettings.setLateInseminationDays(
                 int.tryParse(_late.text) ?? 70,
               );
@@ -434,8 +465,10 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
   Widget _buildInput(
     String label,
     TextEditingController controller,
-    IconData icon,
-  ) {
+    IconData icon, {
+    String? hint,
+    Color? color,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: TextField(
@@ -443,8 +476,16 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
         keyboardType: TextInputType.number,
         decoration: InputDecoration(
           labelText: label,
-          prefixIcon: Icon(icon),
+          hintText: hint,
+          helperText: hint,
+          helperMaxLines: 2,
+          prefixIcon: Icon(icon, color: color),
+          labelStyle: color != null ? TextStyle(color: color) : null,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: color ?? Colors.blue, width: 2),
+          ),
         ),
       ),
     );
@@ -1030,6 +1071,157 @@ class _AdminSettingsBodyState extends ConsumerState<_AdminSettingsBody> {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class CowColorsSettingsPage extends ConsumerWidget {
+  const CowColorsSettingsPage({super.key});
+
+  final List<Color> _palette = const [
+    Colors.blue,
+    Colors.red,
+    Colors.green,
+    Colors.orange,
+    Colors.purple,
+    Colors.teal,
+    Colors.pink,
+    Colors.brown,
+    Colors.amber,
+    Colors.cyan,
+    Colors.indigo,
+    Colors.lime,
+    Colors.deepOrange,
+    Colors.deepPurple,
+    Colors.lightBlue,
+    Colors.lightGreen,
+    Colors.blueGrey,
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final availableColors = ref.watch(cowColorsProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('ألوان الكروت')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text(
+            'الألوان المفعلة حالياً:',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: availableColors.map((colorVal) {
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: Color(colorVal),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(colorVal).withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    right: -5,
+                    top: -5,
+                    child: GestureDetector(
+                      onTap: () {
+                        if (availableColors.length <= 1) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('يجب أن يكون هناك لون واحد على الأقل')),
+                          );
+                          return;
+                        }
+                        _confirmDelete(context, ref, colorVal);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.remove, color: Colors.white, size: 18),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 40),
+          const Divider(),
+          const SizedBox(height: 20),
+          const Text(
+            'إضافة لون جديد من القائمة:',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          const SizedBox(height: 16),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 5,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+            ),
+            itemCount: _palette.length,
+            itemBuilder: (context, index) {
+              final color = _palette[index];
+              final isAlreadyAdded = availableColors.contains(color.toARGB32());
+              
+              return GestureDetector(
+                onTap: isAlreadyAdded ? null : () {
+                  ref.read(cowColorsProvider.notifier).addColor(color.toARGB32());
+                },
+                child: Opacity(
+                  opacity: isAlreadyAdded ? 0.3 : 1.0,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      border: isAlreadyAdded ? Border.all(color: Colors.grey, width: 2) : null,
+                    ),
+                    child: isAlreadyAdded ? const Icon(Icons.check, color: Colors.white) : null,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, WidgetRef ref, int colorVal) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حذف اللون'),
+        content: const Text('هل أنت متأكد من رغبتك في حذف هذا اللون من قائمة الاختيارات؟ لن يتم حذفه من الأبقار التي تستخدمه حالياً، لكن لن يظهر في القائمة عند إضافة بقرة جديدة.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          TextButton(
+            onPressed: () {
+              ref.read(cowColorsProvider.notifier).removeColor(colorVal);
+              Navigator.pop(ctx);
+            },
+            child: const Text('حذف', style: TextStyle(color: Colors.red)),
+          ),
         ],
       ),
     );

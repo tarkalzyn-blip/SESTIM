@@ -16,11 +16,14 @@ class SummaryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cows = ref.watch(cowProvider);
+    final allCows = ref.watch(cowProvider);
     final smartAlerts = ref.watch(alertsProvider);
     final syncStatus = ref.watch(syncStatusProvider);
+    final birthStats = ref.watch(birthStatsProvider);
 
-    // جدولة الإشعارات فقط عند حدوث تغيير حقيقي في التنبيهات وليس في كل إعادة بناء للشاشة
+    // Filter out standalone calves for cow-related stats
+    final cows = allCows.where((c) => !c.isStandaloneCalf).toList();
+
     ref.listen(alertsProvider, (previous, next) {
       if (next.isNotEmpty) {
         final urgentCount = next.where((a) => a.severity == AlertSeverity.high).length;
@@ -31,29 +34,25 @@ class SummaryScreen extends ConsumerWidget {
     final int totalCows = cows.length;
     
     // Breeding Status
-    int breedingReady = 0; // 🟢 جاهزة للتلقيح
-    int breedingMonitoring = 0; // 🟡 تحت الفحص
-    int breedingPregnant = 0; // 🔵 حوامل
-    int breedingLate = 0; // 🔴 تأخر بالتلقيح
-    int breedingEmpty = 0; // ⚪ غير مخصبة (فارغة)
+    int breedingReady = 0; 
+    int breedingMonitoring = 0; 
+    int breedingPregnant = 0; 
+    int breedingLate = 0; 
+    int breedingEmpty = 0; 
 
     // Production Stages
-    int prodMilking = 0; // 🥛 حلوب
-    int prodDrying = 0; // 💤 فترة التجفيف
-    int prodHeifer = 0; // 🐄 بكيرة
+    int prodMilking = 0; 
+    int prodDrying = 0; 
+    int prodHeifer = 0; 
     
-    // Calf counting logic
-    int totalCalves = 0;
-    int maleCalves = 0;
-    int femaleCalves = 0;
-
     final int pregnancyDays = AppSettings.pregnancyDays;
     final int recoveryDays = AppSettings.recoveryDays;
     final int lateInsemDays = AppSettings.lateInseminationDays;
     final int dryingDays = AppSettings.dryingDays;
 
     for (var cow in cows) {
-      bool hasBirthHistory = cow.history.any((e) => e['title'] == 'تسجيل ولادة' || e['title'] == 'تسجيل ولادة سابقة') || cow.isPostBirth;
+      // Use model's built-in logic
+      bool hasBirthHistory = cow.hasGivenBirth || cow.isPostBirth;
       
       // --- حالات التكاثر ---
       if (cow.isInseminated && !cow.isPostBirth) {
@@ -79,29 +78,12 @@ class SummaryScreen extends ConsumerWidget {
       }
 
       // --- مراحل الإنتاج ---
-      if (!hasBirthHistory) {
+      if (cow.isHeifer) {
         prodHeifer++;
       } else if (cow.isInseminated && (pregnancyDays - cow.daysSinceInsemination) <= dryingDays) {
         prodDrying++;
       } else {
         prodMilking++;
-      }
-
-      // --- العجول (الموجودة حالياً فقط) ---
-      for (var event in cow.history) {
-        final title = event['title']?.toString() ?? '';
-        if (title == 'تسجيل ولادة' || title == 'تسجيل ولادة سابقة') {
-          // نتجاهل العجول التي تم استبعادها (بيع، نفوق، أو انتقال للقطيع)
-          if (event['isExited'] == true) continue;
-
-          totalCalves++;
-          String note = event['note'] ?? '';
-          if (note.contains('ذكر')) {
-            maleCalves++;
-          } else if (note.contains('أنثى')) {
-            femaleCalves++;
-          }
-        }
       }
     }
 
@@ -164,8 +146,8 @@ class SummaryScreen extends ConsumerWidget {
                    Row(
                      mainAxisAlignment: MainAxisAlignment.spaceAround,
                      children: [
-                       _buildMiniStat('عجول ذكور', maleCalves, Colors.blue),
-                       _buildMiniStat('عجلات إناث', femaleCalves, Colors.pink),
+                       _buildMiniStat('عجول ذكور', birthStats['male'] ?? 0, Colors.blue),
+                       _buildMiniStat('عجلات إناث', birthStats['female'] ?? 0, Colors.pink),
                      ],
                    ),
                  ]
@@ -238,7 +220,7 @@ class SummaryScreen extends ConsumerWidget {
                 ),
               )
             else
-              ...smartAlerts.map((alert) => _buildSmartAlertCard(context, alert, cows)),
+              ...smartAlerts.map((alert) => _buildSmartAlertCard(context, alert, allCows)),
               
             const SizedBox(height: 30),
             const Text(
@@ -257,13 +239,13 @@ class SummaryScreen extends ConsumerWidget {
               ),
               child: Column(
                 children: [
-                  _buildCalfStatRow('إجمالي العجول', totalCalves, Icons.auto_awesome, Colors.amber),
+                  _buildCalfStatRow('إجمالي العجول', birthStats['total'] ?? 0, Icons.auto_awesome, Colors.amber),
                   const Divider(height: 30),
                   Row(
                     children: [
-                      Expanded(child: _buildGenderStat('عجول (ذكر)', maleCalves, Colors.blue.shade300, Icons.male)),
+                      Expanded(child: _buildGenderStat('عجول (ذكر)', birthStats['male'] ?? 0, Colors.blue.shade300, Icons.male)),
                       const SizedBox(width: 20),
-                      Expanded(child: _buildGenderStat('عجلات (أنثى)', femaleCalves, Colors.pink.shade300, Icons.female)),
+                      Expanded(child: _buildGenderStat('عجلات (أنثى)', birthStats['female'] ?? 0, Colors.pink.shade300, Icons.female)),
                     ],
                   )
                 ],
@@ -307,9 +289,6 @@ class SummaryScreen extends ConsumerWidget {
         break;
     }
 
-
-
-    // لون البقرة الخاص بها
     final cowColor = Color(alert.cowColorValue);
 
     return Container(
@@ -368,7 +347,6 @@ class SummaryScreen extends ConsumerWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          // Badge رقم البقرة بلون كرتها - النظام الجديد
                           CowIdBadge(
                             id: alert.cowId,
                             color: cowColor,
@@ -398,9 +376,9 @@ class SummaryScreen extends ConsumerWidget {
             ),
           ),
         ),
-        ),           // InkWell
-      ),             // Material
-    );               // Container
+        ),           
+      ),             
+    );               
   }
 
   Widget _buildCalfStatRow(String title, int count, IconData icon, Color color) {
@@ -461,7 +439,6 @@ class SummaryScreen extends ConsumerWidget {
         final isFiveItems = items.length == 5;
         final isThreeItems = items.length == 3;
         final isLastItem = item == items.last;
-        // Make the last item full width if it's the odd one out (5 or 3 items)
         double width = (MediaQuery.of(context).size.width - 40 - 12) / 2;
         if ((isFiveItems || isThreeItems) && isLastItem) {
           width = MediaQuery.of(context).size.width - 40;

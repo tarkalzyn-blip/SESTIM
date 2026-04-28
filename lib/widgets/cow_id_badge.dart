@@ -23,44 +23,32 @@ class CowIdBadge extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.3), width: 1.2),
-        color: color.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        color: color.withOpacity(0.12),
+        border: Border.all(color: color.withOpacity(0.2), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          if (showCloud) ...[
-            const Icon(Icons.cloud_done, size: 10, color: Colors.green),
-            const SizedBox(width: 4),
-          ],
+          Icon(Icons.pets, size: fontSize * 0.9, color: color.withOpacity(0.8)),
+          const SizedBox(width: 8),
           Text(
             id,
             style: TextStyle(
-              fontSize: fontSize,
+              fontSize: fontSize + 2,
               fontWeight: FontWeight.w900,
-              color: Theme.of(context).colorScheme.onSurface,
-              height: 1.1, 
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+              height: 1, 
             ),
           ),
-          const SizedBox(width: 6),
-          Transform.translate(
-            offset: const Offset(0, -1), // Move square up by 1 pixel
-            child: Container(
-              width: boxSize,
-              height: boxSize,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(3),
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.3),
-                    blurRadius: 3,
-                    offset: const Offset(0, 1),
-                  )
-                ],
-              ),
+          const SizedBox(width: 4),
+          Container(
+            width: 14,
+            height: 14,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(4),
             ),
           ),
         ],

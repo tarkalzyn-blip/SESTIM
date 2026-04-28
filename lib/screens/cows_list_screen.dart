@@ -96,6 +96,13 @@ class CowsListScreen extends ConsumerWidget {
                       CowFilter.postBirth,
                       currentFilter,
                     ),
+                    const SizedBox(width: 8),
+                    _buildFilterChip(
+                      ref,
+                      'البكيرات',
+                      CowFilter.heifer,
+                      currentFilter,
+                    ),
                   ],
                 ),
               ),

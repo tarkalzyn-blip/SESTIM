@@ -46,6 +46,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  void _handleGuestSignIn() async {
+    await ref.read(authActionProvider.notifier).signInAnonymously();
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authActionProvider);
@@ -209,6 +213,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             icon: const FaIcon(FontAwesomeIcons.google, color: Colors.red),
                             label: const Text('تسجيل الدخول عبر Google', style: TextStyle(color: Colors.black87)),
                             onPressed: authState.isLoading ? null : _handleGoogleSignIn,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // Guest Login Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 55,
+                          child: TextButton.icon(
+                            style: TextButton.styleFrom(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                            ),
+                            icon: const Icon(Icons.person_outline, color: Colors.blueGrey),
+                            label: const Text('الدخول كضيف', style: TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold)),
+                            onPressed: authState.isLoading ? null : _handleGuestSignIn,
                           ),
                         ),
                         const SizedBox(height: 32),

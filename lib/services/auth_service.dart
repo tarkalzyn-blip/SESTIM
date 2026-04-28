@@ -54,6 +54,15 @@ class AuthService {
     }
   }
 
+  // Sign in anonymously (Guest)
+  Future<UserCredential> signInAnonymously() async {
+    try {
+      return await _auth.signInAnonymously();
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   // Reset password
   Future<void> resetPassword(String email) async {
     try {

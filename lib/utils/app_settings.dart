@@ -22,6 +22,11 @@ class AppSettings {
   static Future<void> setHeatCycleDays(int val) =>
       _box.put('heatCycleDays', val);
 
+  static int get minInseminationDaysAfterBirth =>
+      _box.get('minInseminationDaysAfterBirth', defaultValue: 45);
+  static Future<void> setMinInseminationDaysAfterBirth(int val) =>
+      _box.put('minInseminationDaysAfterBirth', val);
+
   static bool get isDarkMode => _box.get('isDarkMode', defaultValue: false);
   static Future<void> setDarkMode(bool val) => _box.put('isDarkMode', val);
 
@@ -60,4 +65,15 @@ class AppSettings {
 
   static bool get isProtectionEnabled => _box.get('protectionEnabled', defaultValue: true);
   static Future<void> setProtectionEnabled(bool value) => _box.put('protectionEnabled', value);
+
+  static List<int> get availableColors {
+    final List<dynamic>? colors = _box.get('availableColors');
+    if (colors == null || colors.isEmpty) {
+      return [0xFF2196F3]; // Colors.blue.toARGB32()
+    }
+    return colors.cast<int>();
+  }
+
+  static Future<void> setAvailableColors(List<int> colors) =>
+      _box.put('availableColors', colors);
 }

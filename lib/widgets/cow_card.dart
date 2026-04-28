@@ -19,6 +19,9 @@ class _CowCardState extends ConsumerState<CowCard> {
 
   @override
   Widget build(BuildContext context) {
+    final cow = widget.cow;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: 1),
       duration: const Duration(milliseconds: 400),
@@ -33,384 +36,370 @@ class _CowCardState extends ConsumerState<CowCard> {
         );
       },
       child: Hero(
-        tag: 'cow_card_${widget.cow.uniqueKey}',
-          child: Card(
-            elevation: 4,
-            shadowColor: widget.cow.color.withOpacity(0.2),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: BorderSide(color: widget.cow.color.withOpacity(0.3), width: 1),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                splashColor: widget.cow.color.withValues(alpha: 0.25),
-                highlightColor: widget.cow.color.withValues(alpha: 0.15),
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(
-                    builder: (_) => CowDetailScreen(cow: widget.cow)
-                  ));
-                },
-                onLongPress: () {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('حذف البقرة'),
-                      content: Text('هل أنت متأكد من حذف البقرة رقم ${widget.cow.id}؟'),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-                        TextButton(
-                          onPressed: () {
-                            ref.read(cowProvider.notifier).deleteCow(widget.cow.uniqueKey);
-                            Navigator.pop(ctx);
-                          },
-                          child: const Text('حذف', style: TextStyle(color: Colors.red)),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-                child: Ink(
-                  padding: const EdgeInsets.all(18.0),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
-                    color: Theme.of(context).cardColor,
-                    boxShadow: [
-                      BoxShadow(
-                        color: widget.cow.color.withOpacity(0.1),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                    border: Border.all(
-                      color: widget.cow.color.withOpacity(0.15),
-                      width: 1.5,
-                    ),
+        tag: 'cow_card_${cow.uniqueKey}',
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(24),
+            onTap: () => Navigator.push(context, MaterialPageRoute(
+              builder: (_) => CowDetailScreen(cow: cow),
+            )),
+            onLongPress: () => _showDeleteDialog(context),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                color: isDark
+                    ? cow.color.withOpacity(0.12)
+                    : cow.color.withOpacity(0.07),
+                border: Border.all(
+                  color: cow.color.withOpacity(0.25),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: cow.color.withOpacity(0.12),
+                    blurRadius: 20,
+                    offset: const Offset(0, 6),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // --- Top Row: Status Chip and Name ---
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Column(
+                  children: [
+                    // ── الشريط العلوي الملوّن ──────────────────────────
+                    Container(
+                      height: 5,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [cow.color, cow.color.withOpacity(0.4)],
+                        ),
+                      ),
+                    ),
+
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                      child: Column(
                         children: [
-                          // الطرف الأيمن (الأول في RTL): شعار الرقم واللون
-                          CowIdBadge(
-                            id: widget.cow.id,
-                            color: widget.cow.color,
-                            showCloud: widget.cow.userId != null,
+                          // ── الصف الأول: الحالة يمين | الرقم يسار ────────
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              // يسار: شعار الرقم واللون
+                              CowIdBadge(
+                                id: cow.id,
+                                color: cow.color,
+                                showCloud: cow.userId != null,
+                              ),
+
+                              // يمين: الحالة
+                              _buildStatusChip(cow),
+                            ],
                           ),
 
-                          // الطرف الأيسر (الثاني في RTL): الحالة
-                          _buildStatusChip(widget.cow),
-                        ],
-                      ),
-                      
-                      const SizedBox(height: 12),
-                      
-                      // --- Middle Section: Data Row ---
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Left Side: Insemination Info (Date and Since)
-                          Expanded(
-                            flex: 5,
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 0.0), // Restored to align with "عمر الحمل"
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                          const SizedBox(height: 16),
+
+                          // ── الصف الثاني: المعلومات ──────────────────────
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              // يسار: تاريخ التلقيح
+                              Row(
                                 children: [
-                                  _buildInfoRow(
-                                    icon: Icons.calendar_today_outlined,
-                                    label: widget.cow.isPostBirth ? 'ولادة:' : 'تلقيح:',
-                                    value: DateFormat('yyyy-MM-dd').format(
-                                      widget.cow.isPostBirth ? widget.cow.birthDate! : widget.cow.inseminationDate
+                                  Icon(Icons.calendar_month_outlined,
+                                      size: 15, color: Colors.grey.shade500),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    DateFormat('dd/MM/yyyy').format(cow.inseminationDate),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade600,
                                     ),
-                                    isHeader: true,
-                                  ),
-                                  const SizedBox(height: 28), // Increased to push the next row down only
-                                  _buildBigInfoRow(
-                                    icon: Icons.vaccines_outlined,
-                                    label: widget.cow.isPostBirth ? 'منذ الولادة' : 'منذ التلقيح',
-                                    value: '${widget.cow.isPostBirth ? widget.cow.daysSinceBirth : widget.cow.daysSinceInsemination}',
-                                    unit: 'يوم',
-                                    color: Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ],
                               ),
-                            ),
-                          ),
-                          
-                          // Right Side: Remaining Days Box
-                          Expanded(
-                            flex: 4,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  'عمر الحمل: ${_formatDaysToMonths(
-                                    widget.cow.isPostBirth 
-                                        ? widget.cow.birthDate!.difference(widget.cow.inseminationDate).inDays 
-                                        : widget.cow.daysSinceInsemination
-                                  )}',
-                                  style: TextStyle(
-                                    fontSize: 12, 
-                                    fontWeight: FontWeight.w600,
-                                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
-                                  ),
-                                  textAlign: TextAlign.end,
+
+                              // يمين: عمر الحمل
+                              Text(
+                                'عمر الحمل: ${cow.isPostBirth ? cow.birthDate!.difference(cow.inseminationDate).inDays : cow.daysSinceInsemination} يوم',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.75),
                                 ),
-                                const SizedBox(height: 8),
-                                _buildRemainingBox(context, widget.cow),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
+
+                          const SizedBox(height: 16),
+
+                          // ── الصف الثالث: الأرقام الكبيرة ────────────────
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // يسار: منذ التلقيح / منذ الولادة
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    cow.isPostBirth ? 'منذ الولادة' : 'منذ التلقيح',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey.shade500),
+                                  ),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                                    textBaseline: TextBaseline.alphabetic,
+                                    children: [
+                                      Text(
+                                        '${cow.isPostBirth ? cow.daysSinceBirth : cow.daysSinceInsemination}',
+                                        style: TextStyle(
+                                          fontSize: 36,
+                                          fontWeight: FontWeight.w900,
+                                          color: Theme.of(context).colorScheme.onSurface,
+                                          height: 1,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'يوم',
+                                        style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.grey.shade400),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+
+                              const Spacer(),
+
+                              // وسط: أيقونة
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: cow.color.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(Icons.grass_rounded,
+                                    size: 22, color: cow.color.withOpacity(0.6)),
+                              ),
+
+                              const Spacer(),
+
+                              // يمين: متبقي للولادة (البطاقة البيضاء)
+                              _buildRemainingBox(context, cow),
+                            ],
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // ── شريط التقدم ──────────────────────────────────
+                          _buildProgressBar(context, cow),
                         ],
                       ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
-                      const SizedBox(height: 16),
-                      
-                      // --- Bottom Section: Progress Bar ---
-                      _buildProgressBar(context, widget.cow),
-                    ],
-                  ),
-                ),         // Ink
-              ),           // InkWell
-            ),             // Material
-          ),               // Card
-        ),                 // Hero
-    );                     // TweenAnimationBuilder
+  void _showDeleteDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('حذف البقرة'),
+        content: Text('هل أنت متأكد من حذف البقرة رقم ${widget.cow.id}؟'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء')),
+          TextButton(
+            onPressed: () {
+              ref.read(cowProvider.notifier).deleteCow(widget.cow.uniqueKey);
+              Navigator.pop(ctx);
+            },
+            child: const Text('حذف', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildStatusChip(Cow cow) {
+    Color chipColor = cow.color;
+    IconData chipIcon = Icons.check_circle_rounded;
+
+    final status = cow.status;
+    if (status.contains('⚠') || status.contains('تجاوز')) {
+      chipColor = Colors.red;
+      chipIcon = Icons.warning_rounded;
+    } else if (status.contains('قريب') || status.contains('شبق متوقع')) {
+      chipColor = Colors.orange;
+      chipIcon = Icons.notifications_active_rounded;
+    } else if (status.contains('بكيرة')) {
+      chipColor = Colors.purple;
+      chipIcon = Icons.star_rounded;
+    } else if (status.contains('حامل') || status.contains('مراقبة')) {
+      chipColor = Colors.blue;
+      chipIcon = Icons.monitor_heart_rounded;
+    } else if (status.contains('ولادة')) {
+      chipColor = Colors.teal;
+      chipIcon = Icons.child_friendly_rounded;
+    }
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: cow.color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(10),
+        color: chipColor.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: chipColor.withOpacity(0.4), width: 1),
       ),
-      child: Text(
-        cow.status.split('(').first.trim(), // Shorten status for chip
-        style: TextStyle(
-          color: cow.color, 
-          fontWeight: FontWeight.w800, 
-          fontSize: 11,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow({required IconData icon, required String label, required String value, bool isHeader = false}) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: Colors.grey),
-        const SizedBox(width: 8),
-        Expanded(
-          child: RichText(
-            text: TextSpan(
-              style: TextStyle(
-                fontSize: isHeader ? 11 : 12,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                fontFamily: Theme.of(context).textTheme.bodyMedium?.fontFamily,
-                fontWeight: FontWeight.w500,
-              ),
-              children: [
-                TextSpan(text: '$label '),
-                TextSpan(
-                  text: value,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.9),
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(chipIcon, size: 15, color: chipColor),
+          const SizedBox(width: 6),
+          Text(
+            status.replaceAll('⚠ ', '').split('(').first.trim(),
+            style: TextStyle(
+              color: chipColor,
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
             ),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBigInfoRow({required IconData icon, required String label, required String value, required String unit, required Color color}) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.04),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, size: 16, color: color.withOpacity(0.8)),
-        ),
-        const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4))),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(
-                  value, 
-                  style: TextStyle(
-                    fontSize: 22, 
-                    fontWeight: FontWeight.w900, 
-                    color: Theme.of(context).colorScheme.onSurface,
-                    height: 1,
-                  )
-                ),
-                const SizedBox(width: 4),
-                Text(unit, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3))),
-              ],
-            ),
-          ],
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildRemainingBox(BuildContext context, Cow cow) {
     final daysRemaining = 280 - cow.daysSinceInsemination;
     final isBirth = cow.isPostBirth;
-    
     final isOverdue = !isBirth && daysRemaining < 0;
-    
-    String label = isBirth ? 'منذ الولادة' : (isOverdue ? 'تجاوزت الموعد' : 'متبقي للولادة');
-    String value = isBirth 
-        ? '${cow.daysSinceBirth}' 
-        : (isOverdue ? '${daysRemaining.abs()}' : '${daysRemaining}');
-    
-    Color boxColor = isOverdue ? Colors.red : cow.color;
-    
+
+    String label = isBirth
+        ? 'منذ الولادة'
+        : (isOverdue ? 'تجاوزت الموعد' : 'متبقي للولادة');
+    String value = isBirth
+        ? '${cow.daysSinceBirth}'
+        : (isOverdue ? '${daysRemaining.abs()}' : '$daysRemaining');
+
+    final boxColor = isOverdue ? Colors.red : cow.color;
+
     return Container(
       width: 140,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: boxColor.withOpacity(0.04),
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Colors.white.withOpacity(0.07)
+            : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: boxColor.withOpacity(0.12), width: 1.2),
-        gradient: LinearGradient(
-          colors: [
-            boxColor.withOpacity(0.05),
-            Colors.transparent,
-          ],
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4))),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      value,
-                      style: TextStyle(
-                        fontSize: 26, 
-                        fontWeight: FontWeight.w900, 
-                        color: isOverdue ? Colors.red : Theme.of(context).colorScheme.onSurface,
-                        height: 1,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text('يوم', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: (isOverdue ? Colors.red : Theme.of(context).colorScheme.onSurface).withOpacity(0.3))),
-                  ],
-                ),
-              ],
-            ),
+        border: Border.all(color: boxColor.withOpacity(0.2), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: boxColor.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
-          const SizedBox(width: 4),
-          Icon(Icons.calendar_month, color: boxColor.withOpacity(0.3), size: 26),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: Colors.grey.shade500),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w900,
+                  color: isOverdue ? Colors.red : boxColor,
+                  height: 1,
+                ),
+              ),
+              const SizedBox(width: 3),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Text(
+                  'يوم',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.grey.shade400),
+                ),
+              ),
+              const Spacer(),
+              Icon(Icons.calendar_today_rounded,
+                  color: boxColor.withOpacity(0.7), size: 18),
+            ],
+          ),
         ],
       ),
     );
   }
 
   Widget _buildProgressBar(BuildContext context, Cow cow) {
-    final targetValue = cow.pregnancyPercentage;
-    return Column(
+    final value = cow.pregnancyPercentage;
+    return Row(
       children: [
-        Row(
-          children: [
-            Text(
-              '${(targetValue * 100).toInt()}%',
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
-                fontSize: 13,
+        Icon(Icons.power_settings_new_rounded,
+            size: 22, color: cow.color.withOpacity(0.7)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Stack(
+            children: [
+              Container(
+                height: 8,
+                decoration: BoxDecoration(
+                  color: cow.color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TweenAnimationBuilder<double>(
-                key: ValueKey(targetValue),
-                tween: Tween<double>(begin: 0, end: targetValue),
-                duration: const Duration(milliseconds: 1200),
-                curve: Curves.easeOutQuart,
-                builder: (context, animValue, child) {
-                  return Stack(
-                    alignment: Alignment.centerRight,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          height: 8,
-                          width: double.infinity,
-                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : Colors.grey.shade200,
-                          child: FractionallySizedBox(
-                            alignment: Alignment.centerRight, // RTL support
-                            widthFactor: animValue,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: cow.color,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: cow.color.withOpacity(0.4),
-                                    blurRadius: 4,
-                                  )
-                                ]
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+              FractionallySizedBox(
+                widthFactor: value,
+                child: Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [cow.color.withOpacity(0.5), cow.color],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Icon(Icons.track_changes, size: 20, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
-          ],
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          '${(value * 100).toInt()}%',
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            color: cow.color,
+            fontSize: 14,
+          ),
         ),
       ],
     );
-  }
-
-  String _formatDaysToMonths(int days) {
-    if (days <= 0) return '0 يوم';
-    int months = days ~/ 30;
-    int remainingDays = days % 30;
-    
-    if (months == 0) return '$remainingDays يوم';
-    if (remainingDays == 0) {
-      if (months == 1) return 'شهر واحد';
-      if (months == 2) return 'شهرين';
-      return '$months أشهر';
-    }
-    
-    String monthsStr = months == 1 ? 'شهر' : (months == 2 ? 'شهرين' : '$months أشهر');
-    return '$monthsStr و $remainingDays يوم';
   }
 }

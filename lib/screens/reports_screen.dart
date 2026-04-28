@@ -28,6 +28,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   
   late FixedExtentScrollController _monthController;
   late FixedExtentScrollController _yearController;
+  
+  late int _yearStart;
+  late int _yearRange;
+
 
   // Audio for wheels
   static const int _poolSize = 6;
@@ -35,11 +39,26 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   int _poolIdx = 0;
   bool _audioReady = false;
 
+  static const List<String> _arabicMonths = [
+    'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+    'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+  ];
+
   @override
   void initState() {
     super.initState();
-    _monthController = FixedExtentScrollController(initialItem: _selectedMonth - 1);
-    _yearController = FixedExtentScrollController(initialItem: 5); // Current year at index 5 (DateTime.now().year - 5)
+    
+    final today = DateTime.now();
+    _yearRange = 100;
+    _yearStart = today.year - 50;
+
+    _monthController = FixedExtentScrollController(
+      initialItem: 37200 + (_selectedMonth - 1),
+    );
+    _yearController = FixedExtentScrollController(
+      initialItem: _selectedYear - _yearStart,
+    );
+    
     _initAudio();
   }
 
@@ -156,101 +175,161 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Inline Date Selection ───────────────────────────────
+                // ── فلتر التاريخ (مباشر) ──────────────────────────────────
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(25),
-                    border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.1)),
+                    color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: theme.colorScheme.primary.withOpacity(0.15),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
                   child: Column(
                     children: [
-                      const Text('تصفية التقارير (عام / شهر)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey)),
-                      const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(Icons.calendar_month_rounded, color: theme.colorScheme.primary, size: 20),
+                            ),
+                            const SizedBox(width: 10),
+                            Text('تصفية التقارير',
+                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: theme.colorScheme.primary)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Row(
+                          children: [
+                            Expanded(child: Center(child: Text('اختر الشهر', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade500)))),
+                            Expanded(child: Center(child: Text('اختر السنة', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade500)))),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
                       SizedBox(
-                        height: 180,
+                        height: 140, // Reduced height for inline display
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
+                            // Highlight band
                             Container(
-                              height: 65,
-                              margin: const EdgeInsets.symmetric(horizontal: 8),
+                              height: 45,
+                              margin: const EdgeInsets.symmetric(horizontal: 16),
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(15),
-                                border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
+                                color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.03),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                             ),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: ListWheelScrollView.useDelegate(
-                                    controller: _yearController,
-                                    itemExtent: 55,
-                                    physics: const FixedExtentScrollPhysics(),
-                                    diameterRatio: 1.5,
-                                    squeeze: 0.9,
-                                    useMagnifier: true,
-                                    magnification: 1.4,
-                                    overAndUnderCenterOpacity: 0.3,
-                                    onSelectedItemChanged: (idx) {
-                                      setState(() => _selectedYear = (DateTime.now().year - 5) + idx);
-                                      _triggerFeedback();
-                                    },
-                                    childDelegate: ListWheelChildBuilderDelegate(
-                                      childCount: 15,
-                                      builder: (context, i) {
-                                        final y = (DateTime.now().year - 5) + i;
-                                        final isSel = y == _selectedYear;
-                                        return Center(
-                                          child: Text(
-                                            y.toString(),
-                                            style: TextStyle(
-                                              fontSize: 22,
-                                              fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                                              color: isSel ? theme.colorScheme.primary : Colors.grey.withValues(alpha: 0.5),
-                                            ),
-                                          ),
-                                        );
-                                      },
+                            // Fade effect
+                            ShaderMask(
+                              shaderCallback: (Rect bounds) {
+                                return const LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.transparent,
+                                    Colors.black,
+                                    Colors.black,
+                                    Colors.transparent,
+                                  ],
+                                  stops: [0.0, 0.35, 0.65, 1.0],
+                                ).createShader(bounds);
+                              },
+                              blendMode: BlendMode.dstIn,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                child: Row(
+                                  children: [
+                                    // Month Wheel
+                                    Expanded(
+                                      child: ListWheelScrollView.useDelegate(
+                                        controller: _monthController,
+                                        itemExtent: 45,
+                                        physics: const MediumSpeedScrollPhysics(),
+                                        diameterRatio: 1.5,
+                                        squeeze: 1.25,
+                                        useMagnifier: false,
+                                        clipBehavior: Clip.none,
+                                        onSelectedItemChanged: (idx) {
+                                          setState(() => _selectedMonth = (idx % 12) + 1);
+                                          _triggerFeedback();
+                                        },
+                                        childDelegate: ListWheelChildBuilderDelegate(
+                                          builder: (context, i) {
+                                            final month = (i % 12) + 1;
+                                            final isSelected = month == _selectedMonth;
+                                            final color = isDark ? (isSelected ? const Color(0xFF0A84FF) : Colors.white60) 
+                                                                 : (isSelected ? const Color(0xFF007AFF) : Colors.black54);
+                                            return Center(
+                                              child: Text(
+                                                month.toString().padLeft(2, '0'),
+                                                style: TextStyle(
+                                                  fontSize: isSelected ? 22 : 18,
+                                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                                  color: color,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                                Container(width: 1, height: 60, color: theme.colorScheme.primary.withValues(alpha: 0.2)),
-                                Expanded(
-                                  child: ListWheelScrollView.useDelegate(
-                                    controller: _monthController,
-                                    itemExtent: 55,
-                                    physics: const FixedExtentScrollPhysics(),
-                                    diameterRatio: 1.5,
-                                    squeeze: 0.9,
-                                    useMagnifier: true,
-                                    magnification: 1.4,
-                                    overAndUnderCenterOpacity: 0.3,
-                                    onSelectedItemChanged: (idx) {
-                                      setState(() => _selectedMonth = (idx % 12) + 1);
-                                      _triggerFeedback();
-                                    },
-                                    childDelegate: ListWheelChildBuilderDelegate(
-                                      builder: (context, i) {
-                                        final m = (i % 12) + 1;
-                                        final isSel = m == _selectedMonth;
-                                        return Center(
-                                          child: Text(
-                                            m.toString().padLeft(2, '0'),
-                                            style: TextStyle(
-                                              fontSize: 22,
-                                              fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                                              color: isSel ? theme.colorScheme.primary : Colors.grey.withValues(alpha: 0.5),
-                                            ),
-                                          ),
-                                        );
-                                      },
+                                    // Year Wheel
+                                    Expanded(
+                                      child: ListWheelScrollView.useDelegate(
+                                        controller: _yearController,
+                                        itemExtent: 45,
+                                        physics: const MediumSpeedScrollPhysics(),
+                                        diameterRatio: 1.5,
+                                        squeeze: 1.25,
+                                        useMagnifier: false,
+                                        clipBehavior: Clip.none,
+                                        onSelectedItemChanged: (idx) {
+                                          setState(() => _selectedYear = _yearStart + idx);
+                                          _triggerFeedback();
+                                        },
+                                        childDelegate: ListWheelChildBuilderDelegate(
+                                          childCount: _yearRange + 1,
+                                          builder: (context, i) {
+                                            final year = _yearStart + i;
+                                            final isSelected = year == _selectedYear;
+                                            final color = isDark ? (isSelected ? const Color(0xFF0A84FF) : Colors.white60) 
+                                                                 : (isSelected ? const Color(0xFF007AFF) : Colors.black54);
+                                            return Center(
+                                              child: Text(
+                                                year.toString(),
+                                                style: TextStyle(
+                                                  fontSize: isSelected ? 22 : 18,
+                                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                                  color: color,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
                           ],
                         ),
