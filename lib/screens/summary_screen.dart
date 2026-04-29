@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cow_pregnancy/providers/cow_provider.dart';
 import 'package:cow_pregnancy/utils/app_settings.dart';
 import 'package:cow_pregnancy/providers/alerts_provider.dart';
-import 'package:cow_pregnancy/widgets/stat_card.dart';
 import 'package:cow_pregnancy/models/cow_model.dart';
 import 'package:cow_pregnancy/screens/settings_screen.dart';
 import 'package:cow_pregnancy/screens/cow_detail_screen.dart';
@@ -40,10 +39,20 @@ class SummaryScreen extends ConsumerWidget {
     int breedingLate = 0; 
     int breedingEmpty = 0; 
 
+    List<Cow> listReady = [];
+    List<Cow> listMonitoring = [];
+    List<Cow> listPregnant = [];
+    List<Cow> listLate = [];
+    List<Cow> listEmpty = [];
+
     // Production Stages
     int prodMilking = 0; 
     int prodDrying = 0; 
     int prodHeifer = 0; 
+
+    List<Cow> listMilking = [];
+    List<Cow> listDrying = [];
+    List<Cow> listHeifer = [];
     
     final int pregnancyDays = AppSettings.pregnancyDays;
     final int recoveryDays = AppSettings.recoveryDays;
@@ -58,32 +67,42 @@ class SummaryScreen extends ConsumerWidget {
       if (cow.isInseminated && !cow.isPostBirth) {
         if (cow.daysSinceInsemination <= 40) {
           breedingMonitoring++;
+          listMonitoring.add(cow);
         } else {
           breedingPregnant++;
+          listPregnant.add(cow);
         }
       } else if (cow.isPostBirth) {
         if (cow.daysSinceBirth > lateInsemDays) {
           breedingLate++;
+          listLate.add(cow);
         } else if (cow.daysSinceBirth >= recoveryDays) {
           breedingReady++;
+          listReady.add(cow);
         } else {
           breedingEmpty++;
+          listEmpty.add(cow);
         }
       } else {
         if (!hasBirthHistory) {
           breedingReady++;
+          listReady.add(cow);
         } else {
           breedingEmpty++;
+          listEmpty.add(cow);
         }
       }
 
       // --- مراحل الإنتاج ---
       if (cow.isHeifer) {
         prodHeifer++;
+        listHeifer.add(cow);
       } else if (cow.isInseminated && (pregnancyDays - cow.daysSinceInsemination) <= dryingDays) {
         prodDrying++;
+        listDrying.add(cow);
       } else {
         prodMilking++;
+        listMilking.add(cow);
       }
     }
 
@@ -161,11 +180,11 @@ class SummaryScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             _buildStatusGrid(context, [
-              _StatusItemData('جاهزة للتلقيح', breedingReady, Colors.green, '🟢'),
-              _StatusItemData('تحت الفحص', breedingMonitoring, Colors.amber, '🟡'),
-              _StatusItemData('حوامل', breedingPregnant, Colors.blue, '🔵'),
-              _StatusItemData('تأخر بالتلقيح', breedingLate, Colors.red, '🔴'),
-              _StatusItemData('فارغة', breedingEmpty, Colors.grey, '⚪'),
+              _StatusItemData('جاهزة للتلقيح', breedingReady, Colors.green, '🟢', listReady, _TimeInfoType.none),
+              _StatusItemData('تحت الفحص', breedingMonitoring, Colors.amber, '🟡', listMonitoring, _TimeInfoType.daysSinceInsemination),
+              _StatusItemData('حوامل', breedingPregnant, Colors.blue, '🔵', listPregnant, _TimeInfoType.monthsDaysSinceInsemination),
+              _StatusItemData('تأخر بالتلقيح', breedingLate, Colors.red, '🔴', listLate, _TimeInfoType.daysSinceBirth),
+              _StatusItemData('فارغة', breedingEmpty, Colors.grey, '⚪', listEmpty, _TimeInfoType.none),
             ]),
             
             const SizedBox(height: 30),
@@ -176,9 +195,9 @@ class SummaryScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             _buildStatusGrid(context, [
-              _StatusItemData('حلوب', prodMilking, Colors.blueAccent, '🥛'),
-              _StatusItemData('فترة التجفيف', prodDrying, Colors.indigo, '💤'),
-              _StatusItemData('بكيرة', prodHeifer, Colors.orange, '🐄'),
+              _StatusItemData('حلوب', prodMilking, Colors.blueAccent, '🥛', listMilking, _TimeInfoType.daysSinceBirth),
+              _StatusItemData('فترة التجفيف', prodDrying, Colors.indigo, '💤', listDrying, _TimeInfoType.daysRemainingUntilBirth),
+              _StatusItemData('بكيرة', prodHeifer, Colors.orange, '🐄', listHeifer, _TimeInfoType.none),
             ]),
             
             const SizedBox(height: 30),
@@ -431,6 +450,159 @@ class SummaryScreen extends ConsumerWidget {
       ],
     );
   }
+
+  void _showCowsListDialog(BuildContext context, String title, List<Cow> cows, Color themeColor, [_TimeInfoType timeInfoType = _TimeInfoType.none]) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        titlePadding: EdgeInsets.zero,
+        title: Container(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+          decoration: BoxDecoration(
+            color: themeColor.withValues(alpha: 0.1),
+            borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: themeColor.withValues(alpha: 0.2), shape: BoxShape.circle),
+                child: Icon(Icons.list_alt_rounded, color: themeColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+              ),
+            ],
+          ),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: cows.isEmpty 
+            ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Text('لا يوجد أبقار في هذه القائمة', textAlign: TextAlign.center),
+              )
+            : ListView.separated(
+                shrinkWrap: true,
+                itemCount: cows.length,
+                separatorBuilder: (context, index) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final cow = cows[index];
+                  final timeParts = _buildTimeParts(cow, timeInfoType);
+                  final String timeTitle = timeParts.$1;
+                  final String timeValue = timeParts.$2;
+
+                  return InkWell(
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => CowDetailScreen(cow: cow),
+                      ));
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                      child: Row(
+                        children: [
+                          // الجانب الأيسر: العنوان والقيمة
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  timeTitle.isNotEmpty ? timeTitle : 'لا توجد بيانات',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: themeColor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (timeValue.isNotEmpty) ...[  
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    timeValue,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          // الجانب الأيمن: شارة الرقم واللون + سهم
+                          CowIdBadge(
+                            id: cow.id,
+                            color: cow.color,
+                            fontSize: 14,
+                            boxSize: 15,
+                          ),
+                          const SizedBox(width: 6),
+                          Icon(Icons.arrow_forward_ios, size: 13, color: Colors.grey.shade400),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إغلاق', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // إرجاع (التسمية، القيمة) كزوج منفصل
+  (String, String) _buildTimeParts(Cow cow, _TimeInfoType type) {
+    switch (type) {
+      case _TimeInfoType.daysSinceBirth:
+        int days = 0;
+        if (cow.birthDate != null) {
+          days = DateTime.now().difference(cow.birthDate!).inDays;
+        } else if (cow.isPostBirth) {
+          days = cow.daysSinceBirth;
+        } else {
+          return ('', '');
+        }
+        return ('منذ الولادة', '$days يوم');
+
+      case _TimeInfoType.daysSinceInsemination:
+        if (!cow.isInseminated) return ('', '');
+        final days = cow.daysSinceInsemination;
+        return ('منذ التلقيح', '$days يوم');
+
+      case _TimeInfoType.monthsDaysSinceInsemination:
+        if (!cow.isInseminated) return ('', '');
+        final days = cow.daysSinceInsemination;
+        final months = days ~/ 30;
+        final remaining = days % 30;
+        if (months > 0) {
+          return ('منذ التلقيح', '$months شهر و$remaining يوم');
+        }
+        return ('منذ التلقيح', '$days يوم');
+
+      case _TimeInfoType.daysRemainingUntilBirth:
+        if (!cow.isInseminated) return ('', '');
+        final daysSinceInsemination = cow.daysSinceInsemination;
+        final daysRemaining = 280 - daysSinceInsemination;
+        if (daysRemaining < 0) {
+          return ('متأخرة عن الولادة', '${-daysRemaining} يوم');
+        }
+        return ('باقي للولادة', '$daysRemaining يوم');
+
+      case _TimeInfoType.none:
+        return ('', '');
+    }
+  }
+
   Widget _buildStatusGrid(BuildContext context, List<_StatusItemData> items) {
     return Wrap(
       spacing: 12,
@@ -444,16 +616,19 @@ class SummaryScreen extends ConsumerWidget {
           width = MediaQuery.of(context).size.width - 40;
         }
 
-        return Container(
-          width: width,
-          decoration: BoxDecoration(
-            color: item.color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: item.color.withValues(alpha: 0.3), width: 1.5),
-            boxShadow: [
-              BoxShadow(color: item.color.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
-            ],
-          ),
+        return InkWell(
+          onTap: () => _showCowsListDialog(context, item.title, item.cows, item.color, item.timeInfoType),
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            width: width,
+            decoration: BoxDecoration(
+              color: item.color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: item.color.withValues(alpha: 0.3), width: 1.5),
+              boxShadow: [
+                BoxShadow(color: item.color.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+              ],
+            ),
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -486,10 +661,11 @@ class SummaryScreen extends ConsumerWidget {
               ),
             ],
           ),
-        );
-      }).toList(),
-    );
-  }
+        ),
+      );
+    }).toList(),
+  );
+}
 }
 
 class _StatusItemData {
@@ -497,5 +673,15 @@ class _StatusItemData {
   final int count;
   final Color color;
   final String emoji;
-  _StatusItemData(this.title, this.count, this.color, this.emoji);
+  final List<Cow> cows;
+  final _TimeInfoType timeInfoType;
+  _StatusItemData(this.title, this.count, this.color, this.emoji, this.cows, [this.timeInfoType = _TimeInfoType.none]);
+}
+
+enum _TimeInfoType {
+  none,
+  daysSinceBirth,
+  daysSinceInsemination,
+  monthsDaysSinceInsemination,
+  daysRemainingUntilBirth,
 }

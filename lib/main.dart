@@ -7,7 +7,6 @@ import 'package:cow_pregnancy/services/notification_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cow_pregnancy/providers/theme_provider.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cow_pregnancy/screens/auth_wrapper.dart';
 import 'package:cow_pregnancy/screens/splash_screen.dart';
 import 'firebase_options.dart'; // ستحتاج لتشغيل flutterfire configure لتوليد هذا الملف
 
@@ -59,7 +58,7 @@ void main() async {
 
   // Initialize Notifications
   try {
-    await NotificationService().init();
+    await NotificationService.init();
   } catch (e) {
     debugPrint("Notification init failed: $e");
   }

@@ -40,11 +40,6 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   int _poolIdx = 0;
   bool _audioReady = false;
 
-  static const List<String> _arabicMonths = [
-    'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-    'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -297,7 +292,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                         diameterRatio: 1.5,
                                         squeeze: 1.25,
                                         useMagnifier: false,
-                                        clipBehavior: Clip.none,
+                                        clipBehavior: Clip.hardEdge,
                                         onSelectedItemChanged: (idx) {
                                           setState(() => _selectedMonth = (idx % 12) + 1);
                                           _triggerFeedback();
@@ -331,7 +326,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                         diameterRatio: 1.5,
                                         squeeze: 1.25,
                                         useMagnifier: false,
-                                        clipBehavior: Clip.none,
+                                        clipBehavior: Clip.hardEdge,
                                         onSelectedItemChanged: (idx) {
                                           setState(() => _selectedYear = _yearStart + idx);
                                           _triggerFeedback();

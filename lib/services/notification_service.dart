@@ -1,65 +1,65 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest_all.dart' as tz;
-import 'package:cow_pregnancy/models/cow_model.dart';
-import 'package:cow_pregnancy/utils/app_settings.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:io';
+import 'package:cow_pregnancy/models/cow_model.dart';
+import 'dart:io' show Platform;
+import 'package:cow_pregnancy/utils/app_settings.dart';
 import 'package:app_settings/app_settings.dart' as ExternalSettings;
+import 'package:cow_pregnancy/providers/alerts_provider.dart';
 
 class NotificationService {
-  static final NotificationService _instance = NotificationService._internal();
-  factory NotificationService() => _instance;
-  NotificationService._internal();
-
-  final FlutterLocalNotificationsPlugin _notificationsPlugin =
+  static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
-  Future<void> init() async {
+  // v21.0.0 API: initialize uses named 'settings' parameter
+  static Future<void> init() async {
+    tz.initializeTimeZones();
+
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    const InitializationSettings initSettings = InitializationSettings(
+      android: androidSettings,
+      iOS: iosSettings,
+    );
+
     try {
-      tz.initializeTimeZones();
-      
-      const AndroidInitializationSettings initializationSettingsAndroid =
-          AndroidInitializationSettings('@mipmap/ic_launcher');
-
-      // إضافة إعدادات الويندوز إن كانت مدعومة في الحزمة
-      // وإذا لم تكن متوافقة تماماً سيتم اصطياد الخطأ في الـ catch
-      // (بعض إصدارات المكتبة لا تحتاجها أو لا تدعمها بشكل كامل بعد)
-      // لكننا سنمررها إن توفرت:
-      /* 
-       ملاحظة: حزمة flutter_local_notifications قد لا تدعم معامل `windows` 
-       مباشرة داخل InitializationSettings في بعض الإصدارات. 
-       لذلك سنتعامل معها بحذر. 
-      */
-      
-      const WindowsInitializationSettings initializationSettingsWindows =
-          WindowsInitializationSettings(
-            appName: 'cow_pregnancy',
-            appUserModelId: 'com.example.cow_pregnancy',
-            guid: '028a3f8b-f482-41f9-9ba3-8706dce446fa',
-          );
-
-      const InitializationSettings initializationSettings = InitializationSettings(
-        android: initializationSettingsAndroid,
-        windows: initializationSettingsWindows,
-      );
-
       await _notificationsPlugin.initialize(
-        settings: initializationSettings,
+        settings: initSettings,
       );
     } catch (e) {
-      debugPrint('Notification Initialization Error: $e');
+      debugPrint('Notification init error: $e');
     }
   }
 
-  Future<void> requestPermission() async {
+  static Future<void> requestPermission() async {
     try {
       if (!kIsWeb && Platform.isAndroid) {
-        _notificationsPlugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
+        final androidPlugin = _notificationsPlugin
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>();
+        if (androidPlugin != null) {
+          try {
+            await androidPlugin.requestNotificationsPermission();
+          } catch (e) {
+            debugPrint('requestNotificationsPermission error: $e');
+          }
+          try {
+            await androidPlugin.requestExactAlarmsPermission();
+          } catch (e) {
+            debugPrint('requestExactAlarmsPermission error: $e');
+          }
+        }
       }
     } catch (e) {
-      debugPrint('Notification Permission Error: $e');
+      debugPrint('requestPermission error: $e');
     }
   }
 
@@ -69,12 +69,12 @@ class NotificationService {
 
       final DateTime insemination = cow.inseminationDate;
       final int baseId = cow.uniqueKey.hashCode;
-      
+
       if (cow.isPostBirth) {
         await _schedule(
           id: baseId + 5,
           title: 'تنبيه تأخير تلقيح: البقرة ${cow.id}',
-          body: 'البقرة صار لها والدة 65 يوم ولم تُلقّح بعد، يرجى التجهيز للتلقيح.',
+          body: 'البقرة صار لها والدة 65 يوم ولم تُلقّح بعد.',
           scheduledDate: cow.birthDate!.add(const Duration(days: 65)),
         );
       } else if (!cow.isInseminated) {
@@ -84,7 +84,6 @@ class NotificationService {
           body: 'راقب البقرة لاحتمال عودة الشبق (مر 19 يوم)',
           scheduledDate: insemination.add(const Duration(days: 19)),
         );
-
         await _schedule(
           id: baseId + 2,
           title: 'موعد الشبق المتوقع: البقرة ${cow.id}',
@@ -98,21 +97,18 @@ class NotificationService {
           body: 'راقب البقرة لاحتمال عدم الحمل (مر 19 يوم)',
           scheduledDate: insemination.add(const Duration(days: 19)),
         );
-
         await _schedule(
           id: baseId + 2,
           title: 'فحص الحمل: البقرة ${cow.id}',
           body: 'يفضل فحص الحمل (مر 30 يوم)',
           scheduledDate: insemination.add(const Duration(days: 30)),
         );
-
         await _schedule(
           id: baseId + 3,
           title: 'تجفيف البقرة: ${cow.id}',
           body: 'يجب تجفيف البقرة (إيقاف الحليب) لاقتراب موعد الولادة',
           scheduledDate: insemination.add(const Duration(days: 220)),
         );
-
         await _schedule(
           id: baseId + 4,
           title: 'موعد الولادة: البقرة ${cow.id}',
@@ -121,10 +117,11 @@ class NotificationService {
         );
       }
     } catch (e) {
-      debugPrint('Notification Scheduling Error: $e');
+      debugPrint('scheduleCowNotifications error: $e');
     }
   }
 
+  // v21.0.0 API: zonedSchedule uses named parameters
   Future<void> _schedule({
     required int id,
     required String title,
@@ -138,11 +135,10 @@ class NotificationService {
 
       final selectedSound = AppSettings.notificationSound;
       final isDefault = selectedSound == 'default_sound';
-      
-      // We change channel ID when sound changes so Android creates a new channel with the new sound
-      final finalChannelId = isDefault ? channelId : '${channelId}_$selectedSound';
-      final RawResourceAndroidNotificationSound? androidSound = isDefault 
-          ? null 
+      final finalChannelId =
+          isDefault ? channelId : '${channelId}_$selectedSound';
+      final RawResourceAndroidNotificationSound? androidSound = isDefault
+          ? null
           : RawResourceAndroidNotificationSound(selectedSound);
 
       await _notificationsPlugin.zonedSchedule(
@@ -161,13 +157,14 @@ class NotificationService {
             sound: androidSound,
             enableVibration: true,
             fullScreenIntent: true,
-            largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+            largeIcon:
+                const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
           ),
         ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       );
     } catch (e) {
-      debugPrint('Notification Zoned Schedule Error: $e');
+      debugPrint('_schedule error: $e');
     }
   }
 
@@ -187,11 +184,12 @@ class NotificationService {
     );
   }
 
+  // v21.0.0 API: cancel uses named 'id' parameter
   Future<void> cancelCustomNotification(int id) async {
     try {
       await _notificationsPlugin.cancel(id: id);
     } catch (e) {
-      debugPrint('Notification Cancel Error: $e');
+      debugPrint('cancelCustomNotification error: $e');
     }
   }
 
@@ -204,19 +202,25 @@ class NotificationService {
       await _notificationsPlugin.cancel(id: baseId + 4);
       await _notificationsPlugin.cancel(id: baseId + 5);
     } catch (e) {
-      debugPrint('Notification Cancel Error: $e');
+      debugPrint('cancelCowNotifications error: $e');
     }
   }
 
-  /// Schedules a daily morning notification at 8:00 AM summarizing active alerts.
-  Future<void> scheduleDailyMorningSummary(int urgentCount, int totalCount) async {
+  Future<void> scheduleDailyMorningSummary(
+      int urgentCount, int totalCount) async {
     try {
-      // Cancel previous daily notification
       await _notificationsPlugin.cancel(id: 99999);
       if (totalCount == 0) return;
 
       final now = DateTime.now();
-      var scheduledDate = DateTime(now.year, now.month, now.day, AppSettings.notificationHour, AppSettings.notificationMinute, 0);
+      var scheduledDate = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        AppSettings.notificationHour,
+        AppSettings.notificationMinute,
+        0,
+      );
       if (scheduledDate.isBefore(now)) {
         scheduledDate = scheduledDate.add(const Duration(days: 1));
       }
@@ -225,8 +229,8 @@ class NotificationService {
           ? '🚨 تنبيه عاجل: $urgentCount مهام عاجلة'
           : '📋 ملخص مزرعتك الصباحي';
       final String body = urgentCount > 0
-          ? 'لديك $urgentCount مهام عاجلة و$totalCount تنبيه بالمجموع. افتح التطبيق لاتخاذ الإجراءات.'
-          : 'لديك $totalCount تنبيه تستحق المتابعة اليوم. تحقق من لوحة التحكم.';
+          ? 'لديك $urgentCount مهام عاجلة و$totalCount تنبيه. افتح التطبيق.'
+          : 'لديك $totalCount تنبيه تستحق المتابعة اليوم.';
 
       await _notificationsPlugin.zonedSchedule(
         id: 99999,
@@ -244,22 +248,30 @@ class NotificationService {
             styleInformation: BigTextStyleInformation(''),
           ),
         ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        matchDateTimeComponents: DateTimeComponents.time, // Repeat daily
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time,
       );
     } catch (e) {
-      debugPrint('Daily Summary Notification Error: $e');
+      debugPrint('scheduleDailyMorningSummary error: $e');
     }
+  }
+
+  static Future<void> scheduleDailyNotification(
+      List<SmartAlert> alerts) async {
+    final int urgentCount =
+        alerts.where((a) => a.severity == AlertSeverity.high).length;
+    final int totalCount = alerts.length;
+    await NotificationService()
+        .scheduleDailyMorningSummary(urgentCount, totalCount);
   }
 
   Future<void> openNotificationSettings() async {
     try {
-      // فتح إعدادات الإشعارات الخاصة بالتطبيق
       await ExternalSettings.AppSettings.openAppSettings(
         type: ExternalSettings.AppSettingsType.notification,
       );
     } catch (e) {
-      debugPrint('Error opening notification settings: $e');
+      debugPrint('openNotificationSettings error: $e');
     }
   }
 }

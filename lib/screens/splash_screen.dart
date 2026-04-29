@@ -21,7 +21,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     // Request permissions safely after the widget is mounted
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      NotificationService().requestPermission();
+      NotificationService.requestPermission();
     });
 
     _controller = AnimationController(
@@ -77,24 +77,21 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(24),
+                  width: 120,
+                  height: 120,
                   decoration: BoxDecoration(
-                    color: Colors.white,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withValues(alpha: 0.2),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
                     ],
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(50),
+                  child: ClipOval(
                     child: Image.asset(
                       'assets/app_icon.png',
-                      width: 80,
-                      height: 80,
                       fit: BoxFit.cover,
                     ),
                   ),

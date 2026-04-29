@@ -10,6 +10,7 @@ import 'package:cow_pregnancy/screens/calves_screen.dart';
 import 'package:cow_pregnancy/screens/activity_log_screen.dart';
 import 'package:cow_pregnancy/screens/reports_screen.dart';
 import 'package:cow_pregnancy/screens/notes_screen.dart';
+import 'package:cow_pregnancy/services/notification_service.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
@@ -267,6 +268,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   Widget build(BuildContext context) {
     ref.listen<List<SmartAlert>>(alertsProvider, (previous, next) {
       _checkAndShowNewAlerts(next);
+      // جدولة الإشعار الصباحي بناءً على التنبيهات الجديدة
+      NotificationService.scheduleDailyNotification(next);
     });
 
     return PopScope(

@@ -8,6 +8,12 @@
     <!-- لاستمرار الإشعارات بعد إعادة التشغيل -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
+    
+    <!-- أذونات الصور والكاميرا -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/> <!-- لأندرويد 13+ -->
     <application
         android:label="مدير القطيع"
         android:name="${applicationName}"

@@ -103,15 +103,6 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> with Sing
     );
   }
 
-  Widget _buildRecoveryList(List<dynamic> items, bool isDark) {
-    if (items.isEmpty) return _emptyState('لا توجد أبقار في مرحلة التعافي');
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: items.length,
-      itemBuilder: (ctx, i) => _buildRecoveryCard(items[i], isDark),
-    );
-  }
-
   Widget _buildSalesList(List<Map<String, dynamic>> items, bool isDark, List<Cow> cows) {
     if (items.isEmpty) return _emptyState('لا توجد مبيعات مسجلة');
     return ListView.builder(
@@ -149,46 +140,6 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> with Sing
   }
 
   Widget _emptyState(String msg) => Center(child: Text(msg, style: const TextStyle(color: Colors.grey, fontSize: 16)));
-
-  Widget _buildRecoveryCard(dynamic cow, bool isDark) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 2,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: Colors.teal.withValues(alpha: 0.1), shape: BoxShape.circle),
-          child: const Icon(Icons.medical_services, color: Colors.teal),
-        ),
-        title: Text('البقرة رقم ${cow.id}', style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text('تاريخ الولادة: ${DateFormat('yyyy/MM/dd').format(cow.birthDate!)}', style: const TextStyle(fontSize: 12)),
-            Text('مرّ ${cow.daysSinceBirth} يوم من فترة التعافي', style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: cow.pregnancyPercentage, // This getter handles recovery % in the model
-                backgroundColor: Colors.teal.withValues(alpha: 0.1),
-                color: Colors.teal,
-                minHeight: 6,
-              ),
-            ),
-          ],
-        ),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(color: cow.color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-          child: Text(cow.status, style: TextStyle(color: cow.color, fontWeight: FontWeight.bold, fontSize: 10)),
-        ),
-      ),
-    );
-  }
 
   Widget _buildLogCard(Map<String, dynamic> item, LogType type, bool isDark, List<Cow> cows) {
     final date = DateTime.parse(item[type == LogType.sale || type == LogType.death ? 'exitDate' : 'date']);

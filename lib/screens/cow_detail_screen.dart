@@ -21,15 +21,36 @@ class CowDetailScreen extends ConsumerWidget {
   const CowDetailScreen({super.key, required this.cow});
 
   Future<void> _pickImage(BuildContext context, WidgetRef ref, Cow currentCow) async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      ref.read(cowProvider.notifier).updateCow(
-        currentCow.copyWith(imagePath: pickedFile.path),
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 70, // لتقليل الحجم وتحسين الأداء
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم تحديث صورة البقرة بنجاح'), backgroundColor: Colors.green),
-      );
+      
+      if (pickedFile != null) {
+        ref.read(cowProvider.notifier).updateCow(
+          currentCow.copyWith(imagePath: pickedFile.path),
+        );
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم تحديث صورة البقرة بنجاح'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('حدث خطأ أثناء اختيار الصورة، يرجى التأكد من الصلاحيات'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -1038,42 +1059,6 @@ class CowDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildDetailRow(
-    String title,
-    String value,
-    IconData icon, {
-    Color? color,
-    Color? subTextColor,
-    Color? textColor,
-  }) {
-    return Row(
-      children: [
-        Icon(icon, color: color ?? Colors.grey.shade700, size: 28),
-        const SizedBox(width: 16),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                color: subTextColor ?? Colors.grey.shade600,
-              ),
-            ),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: color ?? textColor,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
   Widget _buildMainRemainingBox(BuildContext context, Cow cow) {
     final daysSinceInsemination = cow.daysSinceInsemination;
     final daysRemaining = 280 - daysSinceInsemination;
@@ -1159,37 +1144,6 @@ class CowDetailScreen extends ConsumerWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildActionCard(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 30),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(color: color, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
       ),
     );
   }

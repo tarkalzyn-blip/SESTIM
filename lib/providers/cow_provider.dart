@@ -71,11 +71,6 @@ class CowNotifier extends Notifier<List<Cow>> {
     return false; 
   }
 
-  void _stopListeningToCloud() {
-    _subscription?.cancel();
-    _subscription = null;
-  }
-
   void _startConnectivityListener() {
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
       final isConnected = results.any((r) => r != ConnectivityResult.none);
