@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:cow_pregnancy/utils/date_picker_utils.dart';
 import 'package:cow_pregnancy/widgets/custom_date_picker.dart';
@@ -18,13 +20,25 @@ class CowDetailScreen extends ConsumerWidget {
 
   const CowDetailScreen({super.key, required this.cow});
 
+  Future<void> _pickImage(BuildContext context, WidgetRef ref, Cow currentCow) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      ref.read(cowProvider.notifier).updateCow(
+        currentCow.copyWith(imagePath: pickedFile.path),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تحديث صورة البقرة بنجاح'), backgroundColor: Colors.green),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cows = ref.watch(cowProvider);
     // الحصول على أحدث بيانات لهذه البقرة من المزود لضمان التحديث التلقائي
-    final currentCow = cows.firstWhereOrNull(
-      (c) => c.uniqueKey == cow.uniqueKey,
-    ) ?? cow;
+    final currentCow =
+        cows.firstWhereOrNull((c) => c.uniqueKey == cow.uniqueKey) ?? cow;
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -45,7 +59,10 @@ class CowDetailScreen extends ConsumerWidget {
                 const BackButton(color: Colors.white),
                 IconButton(
                   icon: const Icon(Icons.settings, color: Colors.white),
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  ),
                 ),
               ],
             ),
@@ -54,39 +71,59 @@ class CowDetailScreen extends ConsumerWidget {
                 icon: const Icon(Icons.edit_outlined, color: Colors.white),
                 tooltip: 'تعديل',
                 onPressed: () {
-                  ref.read(editAccessProvider.notifier).runWithAccess(context, () {
-                    Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => AddEditCowScreen(cow: currentCow),
-                    ));
-                  });
+                  ref.read(editAccessProvider.notifier).runWithAccess(
+                    context,
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AddEditCowScreen(cow: currentCow),
+                        ),
+                      );
+                    },
+                  );
                 },
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline, color: Colors.white),
                 tooltip: 'حذف',
                 onPressed: () {
-                  ref.read(editAccessProvider.notifier).runWithAccess(context, () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        title: const Text('حذف البقرة'),
-                        content: Text('هل أنت متأكد من حذف البقرة رقم ${currentCow.id}؟ لا يمكن التراجع.'),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
-                          FilledButton(
-                            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                            onPressed: () => Navigator.pop(ctx, true),
-                            child: const Text('حذف'),
+                  ref.read(editAccessProvider.notifier).runWithAccess(
+                    context,
+                    () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                        ],
-                      ),
-                    );
-                    if (confirm == true) {
-                      ref.read(cowProvider.notifier).deleteCow(currentCow.uniqueKey);
-                      if (context.mounted) Navigator.pop(context);
-                    }
-                  });
+                          title: const Text('حذف البقرة'),
+                          content: Text(
+                            'هل أنت متأكد من حذف البقرة رقم ${currentCow.id}؟ لا يمكن التراجع.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('إلغاء'),
+                            ),
+                            FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.red,
+                              ),
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('حذف'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        ref
+                            .read(cowProvider.notifier)
+                            .deleteCow(currentCow.uniqueKey);
+                        if (context.mounted) Navigator.pop(context);
+                      }
+                    },
+                  );
                 },
               ),
             ],
@@ -97,45 +134,105 @@ class CowDetailScreen extends ConsumerWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // خلفية بتدرج غني
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            currentCow.color,
-                            currentCow.color.withOpacity(0.5),
-                            currentCow.color.withOpacity(0.8),
-                          ],
-                          stops: const [0.0, 0.5, 1.0],
+                    // الخلفية
+                    if (currentCow.imagePath != null && currentCow.imagePath!.isNotEmpty)
+                      Positioned.fill(
+                        child: Image.file(
+                          File(currentCow.imagePath!),
+                          fit: BoxFit.cover,
                         ),
-                      ),
-                    ),
-                    // دوائر زخرفية
-                    Positioned(
-                      top: -40, left: -40,
-                      child: Container(
-                        width: 180, height: 180,
+                      )
+                    else
+                      Container(
                         decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.07),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              currentCow.color,
+                              currentCow.color.withOpacity(0.5),
+                              currentCow.color.withOpacity(0.8),
+                            ],
+                            stops: const [0.0, 0.5, 1.0],
+                          ),
+                        ),
+                      ),
+                    
+                    // غطاء داكن لضمان قراءة النصوص
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.6),
+                            ],
+                          ),
                         ),
                       ),
                     ),
+
+                    // دوائر زخرفية (فقط إذا لم يكن هناك صورة)
+                    if (currentCow.imagePath == null || currentCow.imagePath!.isEmpty) ...[
+                      Positioned(
+                        top: -40,
+                        left: -40,
+                        child: Container(
+                          width: 180,
+                          height: 180,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withOpacity(0.07),
+                          ),
+                        ),
+                      ),
+                    ],
                     Positioned(
-                      bottom: 20, right: -30,
+                      bottom: 20,
+                      right: -30,
                       child: Container(
-                        width: 120, height: 120,
+                        width: 120,
+                        height: 120,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: Colors.white.withOpacity(0.05),
                         ),
                       ),
                     ),
+                    // زر إضافة/تغيير الصورة
+                    Positioned(
+                      top: 100,
+                      right: 20,
+                      child: Material(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: const CircleBorder(),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () => _pickImage(context, ref, currentCow),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            child: const Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.camera_alt, color: Colors.white, size: 28),
+                                SizedBox(height: 4),
+                                Text(
+                                  'صورة',
+                                  style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                )
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                     // المحتوى
                     Positioned(
-                      bottom: 20, left: 20, right: 20,
+                      bottom: 20,
+                      left: 20,
+                      right: 20,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -144,15 +241,26 @@ class CowDetailScreen extends ConsumerWidget {
                             color: Colors.white,
                             fontSize: 22,
                             boxSize: 18,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
                           ),
                           const SizedBox(height: 10),
                           Row(
                             children: [
-                              _headerChip(Icons.circle, currentCow.status.split('(').first.trim(), Colors.white),
+                              _headerChip(
+                                Icons.circle,
+                                currentCow.status.split('(').first.trim(),
+                                Colors.white,
+                              ),
                               const SizedBox(width: 8),
                               if (currentCow.age != 'غير محدد')
-                                _headerChip(Icons.cake_outlined, currentCow.age, Colors.white),
+                                _headerChip(
+                                  Icons.cake_outlined,
+                                  currentCow.age,
+                                  Colors.white,
+                                ),
                             ],
                           ),
                         ],
@@ -174,7 +282,13 @@ class CowDetailScreen extends ConsumerWidget {
                   const SizedBox(height: 20),
 
                   // ── بطاقة المعلومات ───────────────────────────────────────
-                  _buildInfoCard(context, currentCow, isDark, subTextColor, textColor),
+                  _buildInfoCard(
+                    context,
+                    currentCow,
+                    isDark,
+                    subTextColor,
+                    textColor,
+                  ),
                   const SizedBox(height: 20),
 
                   // ── تنبيه تجاوز موعد الولادة ─────────────────────────────
@@ -190,17 +304,30 @@ class CowDetailScreen extends ConsumerWidget {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+                          const Icon(
+                            Icons.warning_amber_rounded,
+                            color: Colors.red,
+                            size: 28,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('تنبيه: تجاوز موعد الولادة',
-                                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15)),
+                                const Text(
+                                  'تنبيه: تجاوز موعد الولادة',
+                                  style: TextStyle(
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                ),
                                 Text(
                                   'تجاوزت موعد الولادة بـ ${currentCow.daysSinceInsemination - 280} يوم',
-                                  style: TextStyle(color: Colors.red.withOpacity(0.8), fontSize: 13),
+                                  style: TextStyle(
+                                    color: Colors.red.withOpacity(0.8),
+                                    fontSize: 13,
+                                  ),
                                 ),
                               ],
                             ),
@@ -259,9 +386,15 @@ class CowDetailScreen extends ConsumerWidget {
                             icon: Icons.child_friendly,
                             label: 'تسجيل ولادة',
                             color: Colors.teal,
-                            onTap: () => ref.read(editAccessProvider.notifier).runWithAccess(
+                            onTap: () => ref
+                                .read(editAccessProvider.notifier)
+                                .runWithAccess(
                                   context,
-                                  () => _showBirthDialog(context, ref, currentCow),
+                                  () => _showBirthDialog(
+                                    context,
+                                    ref,
+                                    currentCow,
+                                  ),
                                 ),
                           ),
                         ),
@@ -272,14 +405,16 @@ class CowDetailScreen extends ConsumerWidget {
                           icon: Icons.science_outlined,
                           label: 'تسجيل تلقيح',
                           color: Colors.blueAccent,
-                          onTap: () => ref.read(editAccessProvider.notifier).runWithAccess(
-                            context,
-                            () => _showAddInseminationDialog(
-                              context,
-                              ref,
-                              currentCow,
-                            ),
-                          ),
+                          onTap: () => ref
+                              .read(editAccessProvider.notifier)
+                              .runWithAccess(
+                                context,
+                                () => _showAddInseminationDialog(
+                                  context,
+                                  ref,
+                                  currentCow,
+                                ),
+                              ),
                         ),
                       ),
                     ],
@@ -291,10 +426,12 @@ class CowDetailScreen extends ConsumerWidget {
                       icon: Icons.note_add_outlined,
                       label: 'إضافة ملاحظة',
                       color: Colors.orange,
-                      onTap: () => ref.read(editAccessProvider.notifier).runWithAccess(
-                        context,
-                        () => _showAddNoteDialog(context, ref, currentCow),
-                      ),
+                      onTap: () => ref
+                          .read(editAccessProvider.notifier)
+                          .runWithAccess(
+                            context,
+                            () => _showAddNoteDialog(context, ref, currentCow),
+                          ),
                     ),
                   ),
 
@@ -385,10 +522,17 @@ class CowDetailScreen extends ConsumerWidget {
                   subtitle: const Text('تعديل الملاحظة أو التاريخ'),
                   onTap: () {
                     Navigator.pop(ctx);
-                    ref.read(editAccessProvider.notifier).runWithAccess(
-                      context,
-                      () => _showEditHistoryDialog(context, ref, currentCow, event),
-                    );
+                    ref
+                        .read(editAccessProvider.notifier)
+                        .runWithAccess(
+                          context,
+                          () => _showEditHistoryDialog(
+                            context,
+                            ref,
+                            currentCow,
+                            event,
+                          ),
+                        );
                   },
                 ),
                 const Divider(height: 1, indent: 16, endIndent: 16),
@@ -407,45 +551,52 @@ class CowDetailScreen extends ConsumerWidget {
                   subtitle: const Text('إزالة هذا الحدث من السجل التاريخي'),
                   onTap: () {
                     Navigator.pop(ctx);
-                    ref.read(editAccessProvider.notifier).runWithAccess(context, () {
-                      showDialog(
-                        context: context,
-                        builder: (dctx) => AlertDialog(
-                          title: const Text('حذف السجل'),
-                          content: Text('هل أنت متأكد من حذف "$title"؟'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(dctx),
-                              child: const Text('إلغاء'),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.pop(dctx);
-                                final newHistory = currentCow.history
-                                    .where((e) => e['eventId'] != eventId)
-                                    .toList();
-                                ref.read(cowProvider.notifier).updateCow(
-                                      currentCow.copyWith(history: newHistory),
-                                    );
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('تم حذف السجل'),
-                                    backgroundColor: Colors.red,
+                    ref.read(editAccessProvider.notifier).runWithAccess(
+                      context,
+                      () {
+                        showDialog(
+                          context: context,
+                          builder: (dctx) => AlertDialog(
+                            title: const Text('حذف السجل'),
+                            content: Text('هل أنت متأكد من حذف "$title"؟'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(dctx),
+                                child: const Text('إلغاء'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.pop(dctx);
+                                  final newHistory = currentCow.history
+                                      .where((e) => e['eventId'] != eventId)
+                                      .toList();
+                                  ref
+                                      .read(cowProvider.notifier)
+                                      .updateCow(
+                                        currentCow.copyWith(
+                                          history: newHistory,
+                                        ),
+                                      );
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('تم حذف السجل'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                },
+                                child: const Text(
+                                  'حذف',
+                                  style: TextStyle(
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                );
-                              },
-                              child: const Text(
-                                'حذف',
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      );
-                    });
+                            ],
+                          ),
+                        );
+                      },
+                    );
                   },
                 ),
                 const Divider(height: 1, indent: 16, endIndent: 16),
@@ -503,20 +654,23 @@ class CowDetailScreen extends ConsumerWidget {
                   ),
                   if (note.isNotEmpty)
                     Text(note, style: TextStyle(color: subTextColor)),
-                  
+
                   // Summary chips for vaccines and weights
-                  if (event['vaccines'] != null || event['weights'] != null) ...[
+                  if (event['vaccines'] != null ||
+                      event['weights'] != null) ...[
                     const SizedBox(height: 4),
                     Wrap(
                       spacing: 8,
                       children: [
-                        if (event['vaccines'] != null && (event['vaccines'] as List).isNotEmpty)
+                        if (event['vaccines'] != null &&
+                            (event['vaccines'] as List).isNotEmpty)
                           _buildSummaryChip(
                             Icons.vaccines,
                             '${(event['vaccines'] as List).length} لقاح',
                             Colors.teal,
                           ),
-                        if (event['weights'] != null && (event['weights'] as List).isNotEmpty)
+                        if (event['weights'] != null &&
+                            (event['weights'] as List).isNotEmpty)
                           _buildSummaryChip(
                             Icons.monitor_weight,
                             '${(event['weights'] as List).length} وزن',
@@ -675,37 +829,156 @@ class CowDetailScreen extends ConsumerWidget {
         children: [
           Icon(icon, size: 12, color: color),
           const SizedBox(width: 5),
-          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoCard(BuildContext context, Cow cow, bool isDark, Color subColor, Color textColor) {
+  String _formatDuration(int totalDays) {
+    if (totalDays < 30) return '$totalDays يوم';
+    final int m = totalDays ~/ 30;
+    final int d = totalDays % 30;
+
+    if (d == 0) return '$m شهر';
+    return '$m شهر و $d يوم';
+  }
+
+  Widget _buildInfoCard(
+    BuildContext context,
+    Cow cow,
+    bool isDark,
+    Color subColor,
+    Color textColor,
+  ) {
     final items = <_InfoItem>[];
 
     items.add(_InfoItem(Icons.timer_outlined, 'العمر الحالي', cow.age, null));
 
     if (cow.isPostBirth) {
-      items.add(_InfoItem(Icons.child_care, 'تاريخ الولادة',
-          DateFormat('yyyy/MM/dd').format(cow.birthDate!), Colors.teal));
-      items.add(_InfoItem(Icons.hourglass_bottom, 'منذ الولادة',
-          '${cow.daysSinceBirth} يوم', Colors.teal));
+      items.add(
+        _InfoItem(
+          Icons.child_care,
+          'تاريخ الولادة',
+          DateFormat('yyyy/MM/dd').format(cow.birthDate!),
+          Colors.teal,
+        ),
+      );
+      items.add(
+        _InfoItem(
+          Icons.hourglass_bottom,
+          'منذ الولادة',
+          _formatDuration(cow.daysSinceBirth),
+          Colors.teal,
+        ),
+      );
     } else {
-      items.add(_InfoItem(Icons.calendar_today,
+      items.add(
+        _InfoItem(
+          Icons.calendar_today,
           cow.isInseminated ? 'تاريخ التلقيح' : 'تاريخ آخر شبق',
-          DateFormat('yyyy/MM/dd').format(cow.inseminationDate), Colors.blue));
-      items.add(_InfoItem(Icons.timer, 'الأيام المنقضية',
-          '${cow.daysSinceInsemination} يوم', Colors.blue));
+          DateFormat('yyyy/MM/dd').format(cow.inseminationDate),
+          Colors.blue,
+        ),
+      );
+      items.add(
+        _InfoItem(
+          Icons.timer,
+          'الأيام المنقضية',
+          _formatDuration(cow.daysSinceInsemination),
+          Colors.blue,
+        ),
+      );
     }
 
     if (cow.bullId != null && cow.bullId!.isNotEmpty)
-      items.add(_InfoItem(Icons.pets, 'رقم الثور', cow.bullId!, Colors.blueGrey));
+      items.add(
+        _InfoItem(Icons.pets, 'رقم الثور', cow.bullId!, Colors.blueGrey),
+      );
 
     if (cow.motherId != null && cow.motherId!.isNotEmpty)
-      items.add(_InfoItem(Icons.family_restroom, 'رقم الأم', cow.motherId!, Colors.blueGrey));
+      items.add(
+        _InfoItem(
+          Icons.family_restroom,
+          'رقم الأم',
+          cow.motherId!,
+          Colors.blueGrey,
+        ),
+      );
 
     items.add(_InfoItem(Icons.info_outline, 'الحالة', cow.status, cow.color));
+
+    final lastBirthDays = cow.daysSinceLastBirth;
+    final lastBirthText = lastBirthDays != null ? '$lastBirthDays يوم' : 'لا يوجد ولادة مسجلة';
+    final lastBirthColor = lastBirthDays != null ? Colors.deepOrange : Colors.grey;
+
+    Widget gridCell(_InfoItem item) => Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: (item.color ?? Colors.grey).withValues(alpha: 0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: (item.color ?? Colors.grey).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(item.icon, color: item.color ?? Colors.grey.shade600, size: 16),
+              ),
+              Flexible(
+                child: Text(
+                  item.label,
+                  textAlign: TextAlign.end,
+                  style: TextStyle(fontSize: 11, color: subColor, fontWeight: FontWeight.w500),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            item.value,
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: item.color ?? textColor),
+            textAlign: TextAlign.end,
+          ),
+        ],
+      ),
+    );
+
+    // Split items into pairs for 2-column grid
+    final List<Widget> rows = [];
+    for (int i = 0; i < items.length; i += 2) {
+      final left = items[i];
+      final right = i + 1 < items.length ? items[i + 1] : null;
+      rows.add(
+        Row(
+          children: [
+            Expanded(child: gridCell(left)),
+            const SizedBox(width: 10),
+            right != null
+                ? Expanded(child: gridCell(right))
+                : const Expanded(child: SizedBox()),
+          ],
+        ),
+      );
+      rows.add(const SizedBox(height: 10));
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -713,47 +986,54 @@ class CowDetailScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: cow.color.withOpacity(0.15), width: 1.5),
         boxShadow: [
-          BoxShadow(color: cow.color.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: cow.color.withOpacity(0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
+      padding: const EdgeInsets.all(14),
       child: Column(
-        children: items.asMap().entries.map((entry) {
-          final i = entry.key;
-          final item = entry.value;
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                child: Row(
+        children: [
+          ...rows,
+          // حقل دائم: منذ آخر ولادة
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: lastBirthColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: lastBirthColor.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(9),
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: (item.color ?? Colors.grey).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
+                        color: lastBirthColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(item.icon, color: item.color ?? Colors.grey.shade600, size: 22),
+                      child: Icon(Icons.cake_outlined, color: lastBirthColor, size: 16),
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(item.label, style: TextStyle(fontSize: 12, color: subColor, fontWeight: FontWeight.w500)),
-                          const SizedBox(height: 2),
-                          Text(item.value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
-                              color: item.color ?? textColor)),
-                        ],
-                      ),
+                    const SizedBox(width: 10),
+                    Text(
+                      lastBirthText,
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: lastBirthColor),
                     ),
                   ],
                 ),
-              ),
-              if (i < items.length - 1)
-                Divider(height: 1, indent: 56, color: Colors.grey.withOpacity(0.12)),
-            ],
-          );
-        }).toList(),
+                Text(
+                  'منذ آخر ولادة',
+                  style: TextStyle(fontSize: 12, color: subColor, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -848,7 +1128,7 @@ class CowDetailScreen extends ConsumerWidget {
                       color: isOverdue
                           ? Colors.red
                           : Theme.of(context).colorScheme.onSurface,
-                      height: 1.1,
+                      height: 1,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -928,12 +1208,17 @@ class CowDetailScreen extends ConsumerWidget {
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             title: const Row(
               children: [
                 Icon(Icons.block, color: Colors.red),
                 SizedBox(width: 8),
-                Text('التلقيح مبكر جداً', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  'التلقيح مبكر جداً',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ],
             ),
             content: Text(
@@ -1264,6 +1549,7 @@ class CowDetailScreen extends ConsumerWidget {
                 String calfId = calfIdController.text.trim();
                 newHistory.add({
                   'title': 'تسجيل ولادة',
+                  'type': 'birth',
                   'date': selectedBirthDate.toIso8601String(),
                   'eventId': DateTime.now().millisecondsSinceEpoch.toString(),
                   'calfId': calfId.isEmpty ? null : calfId,
@@ -1331,7 +1617,10 @@ class CowDetailScreen extends ConsumerWidget {
                     }
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.grey.shade400),
                       borderRadius: BorderRadius.circular(10),
@@ -1367,7 +1656,7 @@ class CowDetailScreen extends ConsumerWidget {
             FilledButton(
               onPressed: () {
                 if (noteController.text.trim().isEmpty) return;
-                
+
                 List<dynamic> newHistory = currentCow.history.toList();
                 newHistory.add({
                   'title': 'ملاحظة',
@@ -1376,9 +1665,9 @@ class CowDetailScreen extends ConsumerWidget {
                   'note': noteController.text.trim(),
                 });
 
-                ref.read(cowProvider.notifier).updateCow(
-                  currentCow.copyWith(history: newHistory),
-                );
+                ref
+                    .read(cowProvider.notifier)
+                    .updateCow(currentCow.copyWith(history: newHistory));
 
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(

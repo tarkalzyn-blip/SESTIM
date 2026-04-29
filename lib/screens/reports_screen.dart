@@ -24,6 +24,7 @@ class ReportsScreen extends ConsumerStatefulWidget {
 class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   int _selectedYear = DateTime.now().year;
   int _selectedMonth = DateTime.now().month;
+  int _reportType = 0; // 0: Actual, 1: Expected
   final ScreenshotController _screenshotController = ScreenshotController();
   
   late FixedExtentScrollController _monthController;
@@ -136,18 +137,47 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       if (birthDate == null) continue;
 
       if (birthDate.year == _selectedYear) {
-        birthsInYear++;
         monthlyBirths[birthDate.month] = (monthlyBirths[birthDate.month] ?? 0) + 1;
-        
-        if (birthDate.month == _selectedMonth) {
-          birthsInMonth++;
-          monthBirthDetails.add({
-            'cowName': 'بقرة',
-            'cowId': calf['motherId'],
-            'date': birthDate,
-            'calfId': (calf['calfId'] ?? '').toString(),
-            'isMale': calf['note'].toString().contains('ذكر') || (calf['calfColorValue'] == 0xFF2196F3),
-          });
+      }
+    }
+
+    if (_reportType == 0) {
+      // Actual Births
+      for (var calf in allCalves) {
+        DateTime? birthDate = _flexibleDateParse(calf['date']);
+        if (birthDate == null) continue;
+
+        if (birthDate.year == _selectedYear) {
+          birthsInYear++;
+          if (birthDate.month == _selectedMonth) {
+            birthsInMonth++;
+            monthBirthDetails.add({
+              'cowId': calf['motherId'],
+              'date': birthDate,
+              'calfId': (calf['calfId'] ?? '').toString(),
+              'isMale': calf['note'].toString().contains('ذكر') || (calf['calfColorValue'] == 0xFF2196F3),
+            });
+          }
+        }
+      }
+    } else {
+      // Expected Births
+      for (var cow in cows) {
+        if (cow.isInseminated && !cow.isPostBirth) {
+          final expectedDate = cow.inseminationDate.add(const Duration(days: 280));
+          if (expectedDate.year == _selectedYear) {
+            birthsInYear++;
+            if (expectedDate.month == _selectedMonth) {
+              birthsInMonth++;
+              monthBirthDetails.add({
+                'cowId': cow.id,
+                'date': expectedDate,
+                'isExpected': true,
+                'uniqueKey': cow.uniqueKey,
+                'color': cow.color,
+              });
+            }
+          }
         }
       }
     }
@@ -337,6 +367,32 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 20),
+
+                // ── نوع العرض (فعلية / متوقعة) ───────────────────────────
+                Center(
+                  child: Column(
+                    children: [
+                      Text('نوع العرض', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildToggleBtn(0, 'الولادات الفعلية', Icons.bar_chart, Colors.blue),
+                            const SizedBox(width: 4),
+                            _buildToggleBtn(1, 'الولادات المتوقعة', Icons.trending_up, Colors.teal),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 24),
 
                 // ── Calves Report (Requested first) ────────────────────
@@ -389,15 +445,16 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
                 const SizedBox(height: 32),
 
-                _sectionTitle('📈 الرسوم البيانية المتقدمة'),
-                const SizedBox(height: 16),
-                _buildBirthsChart(monthlyBirths, isDark, _selectedYear),
-                const SizedBox(height: 24),
-                _buildGenderDistributionChart(maleCalves, femaleCalves, isDark),
+                if (_reportType == 0) ...[
+                  _sectionTitle('📈 الرسوم البيانية المتقدمة'),
+                  const SizedBox(height: 16),
+                  _buildBirthsChart(monthlyBirths, isDark, _selectedYear),
+                  const SizedBox(height: 24),
+                  _buildGenderDistributionChart(maleCalves, femaleCalves, isDark),
+                  const SizedBox(height: 32),
+                ],
 
-                const SizedBox(height: 32),
-
-                _sectionTitle('📋 تفاصيل ولادات شهر $_selectedMonth / $_selectedYear'),
+                _sectionTitle(_reportType == 0 ? '📋 تفاصيل ولادات شهر $_selectedMonth / $_selectedYear' : '📋 توقعات ولادات شهر $_selectedMonth / $_selectedYear'),
                 const SizedBox(height: 12),
                 if (monthBirthDetails.isEmpty)
                   Container(
@@ -407,7 +464,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                       color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(15),
                     ),
-                    child: const Text('لا توجد ولادات مسجلة في هذا الشهر.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+                    child: Text(_reportType == 0 ? 'لا توجد ولادات مسجلة في هذا الشهر.' : 'لا توجد ولادات متوقعة في هذا الشهر.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
                   )
                 else
                   ListView.separated(
@@ -418,40 +475,77 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                     itemBuilder: (ctx, i) {
                       final b = monthBirthDetails[i];
                       final bDate = b['date'] as DateTime;
-                      final isMale = b['isMale'] as bool;
-                      return Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
-                          borderRadius: BorderRadius.circular(15),
-                          border: Border.all(color: (isMale ? Colors.blue : Colors.pink).withValues(alpha: 0.2)),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 45, height: 45,
-                              decoration: BoxDecoration(color: (isMale ? Colors.blue : Colors.pink).withValues(alpha: 0.1), shape: BoxShape.circle),
-                              child: Icon(isMale ? Icons.male : Icons.female, color: isMale ? Colors.blue : Colors.pink),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('الأم: ${b['cowName']} (${b['cowId']})', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  Text('التاريخ: ${bDate.day}/${bDate.month}/${bDate.year}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                ],
+                      
+                      if (_reportType == 0) {
+                        final isMale = b['isMale'] as bool;
+                        return Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(color: (isMale ? Colors.blue : Colors.pink).withValues(alpha: 0.2)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 45, height: 45,
+                                decoration: BoxDecoration(color: (isMale ? Colors.blue : Colors.pink).withValues(alpha: 0.1), shape: BoxShape.circle),
+                                child: Icon(isMale ? Icons.male : Icons.female, color: isMale ? Colors.blue : Colors.pink),
                               ),
-                            ),
-                            if (b['calfId'].toString().isNotEmpty)
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('رقم الأم: ${b['cowId']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    Text('التاريخ: ${bDate.day}/${bDate.month}/${bDate.year}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                  ],
+                                ),
+                              ),
+                              if (b['calfId'].toString().isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                                  child: Text('عجل: ${b['calfId']}', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 12)),
+                                ),
+                            ],
+                          ),
+                        );
+                      } else {
+                        final color = b['color'] as Color;
+                        return Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(color: color.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 45, height: 45,
+                                decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
+                                child: Icon(Icons.auto_awesome, color: color),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('رقم البقرة: ${b['cowId']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    Text('الموعد المتوقع: ${bDate.day}/${bDate.month}/${bDate.year}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                  ],
+                                ),
+                              ),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                                child: Text('عجل: ${b['calfId']}', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 12)),
+                                decoration: BoxDecoration(color: Colors.teal.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                                child: const Text('متوقع', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 12)),
                               ),
-                          ],
-                        ),
-                      );
+                            ],
+                          ),
+                        );
+                      }
                     },
                   ),
                 const SizedBox(height: 40),
@@ -599,12 +693,27 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             Expanded(
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.blue.withValues(alpha: 0.2))),
+                decoration: BoxDecoration(
+                  color: (_reportType == 0 ? Colors.blue : Colors.teal).withValues(alpha: 0.1), 
+                  borderRadius: BorderRadius.circular(15), 
+                  border: Border.all(color: (_reportType == 0 ? Colors.blue : Colors.teal).withValues(alpha: 0.2))
+                ),
                 child: Column(
                   children: [
-                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.calendar_today, size: 14, color: Colors.blue), const SizedBox(width: 4), Text('ولادات شهر $selectedMonth', style: const TextStyle(fontSize: 12, color: Colors.blueGrey))]),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center, 
+                      children: [
+                        Icon(Icons.calendar_today, size: 14, color: _reportType == 0 ? Colors.blue : Colors.teal), 
+                        const SizedBox(width: 4), 
+                        Text(_reportType == 0 ? 'ولادات شهر $selectedMonth' : 'توقعات شهر $selectedMonth', style: const TextStyle(fontSize: 12, color: Colors.blueGrey))
+                      ]
+                    ),
                     const SizedBox(height: 6),
-                    Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), decoration: BoxDecoration(color: Colors.blue, borderRadius: BorderRadius.circular(10)), child: Text('$birthsMonth', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: Colors.white))),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), 
+                      decoration: BoxDecoration(color: _reportType == 0 ? Colors.blue : Colors.teal, borderRadius: BorderRadius.circular(10)), 
+                      child: Text('$birthsMonth', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: Colors.white))
+                    ),
                   ],
                 ),
               ),
@@ -613,12 +722,27 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             Expanded(
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                decoration: BoxDecoration(color: Colors.deepPurple.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.deepPurple.withValues(alpha: 0.2))),
+                decoration: BoxDecoration(
+                  color: (_reportType == 0 ? Colors.deepPurple : Colors.indigo).withValues(alpha: 0.1), 
+                  borderRadius: BorderRadius.circular(15), 
+                  border: Border.all(color: (_reportType == 0 ? Colors.deepPurple : Colors.indigo).withValues(alpha: 0.2))
+                ),
                 child: Column(
                   children: [
-                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.calendar_month, size: 14, color: Colors.deepPurple), const SizedBox(width: 4), Text('ولادات عام $selectedYear', style: const TextStyle(fontSize: 12, color: Colors.blueGrey))]),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center, 
+                      children: [
+                        Icon(Icons.calendar_month, size: 14, color: _reportType == 0 ? Colors.deepPurple : Colors.indigo), 
+                        const SizedBox(width: 4), 
+                        Text(_reportType == 0 ? 'ولادات عام $selectedYear' : 'توقعات عام $selectedYear', style: const TextStyle(fontSize: 12, color: Colors.blueGrey))
+                      ]
+                    ),
                     const SizedBox(height: 6),
-                    Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), decoration: BoxDecoration(color: Colors.deepPurple, borderRadius: BorderRadius.circular(10)), child: Text('$birthsYear', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: Colors.white))),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), 
+                      decoration: BoxDecoration(color: _reportType == 0 ? Colors.deepPurple : Colors.indigo, borderRadius: BorderRadius.circular(10)), 
+                      child: Text('$birthsYear', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: Colors.white))
+                    ),
                   ],
                 ),
               ),
@@ -628,6 +752,36 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       ],
     ),
   );
+
+  Widget _buildToggleBtn(int type, String label, IconData icon, Color color) {
+    final isSelected = _reportType == type;
+    return GestureDetector(
+      onTap: () => setState(() => _reportType = type),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? color : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: isSelected ? [BoxShadow(color: color.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))] : [],
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: isSelected ? Colors.white : Colors.grey),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.white : Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _calveStatCol(String label, int val, Color color) => Expanded(child: Column(children: [Text('$val', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color)), Text(label, style: const TextStyle(fontSize: 11, color: Colors.blueGrey))]));
 

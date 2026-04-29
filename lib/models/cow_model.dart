@@ -14,9 +14,9 @@ class Cow {
   final int? motherColorValue;
   final String? userId; // For cloud sync
   final DateTime? dateOfBirth;
-  final bool
-  isStandaloneCalf; // New: True if it's currently managed in calves screen
+  final bool isStandaloneCalf; // New: True if it's currently managed in calves screen
   final String? gender; // New: 'male' or 'female'
+  final String? imagePath; // مسار صورة البقرة
 
   Cow({
     required this.id,
@@ -32,6 +32,7 @@ class Cow {
     this.dateOfBirth,
     this.isStandaloneCalf = false,
     this.gender,
+    this.imagePath,
   });
 
   Map<String, dynamic> toMap() {
@@ -49,6 +50,7 @@ class Cow {
       'dateOfBirth': dateOfBirth?.toIso8601String(),
       'isStandaloneCalf': isStandaloneCalf,
       'gender': gender,
+      'imagePath': imagePath,
     };
   }
 
@@ -71,6 +73,7 @@ class Cow {
           : null,
       isStandaloneCalf: map['isStandaloneCalf'] ?? false,
       gender: map['gender'],
+      imagePath: map['imagePath'],
     );
   }
 
@@ -88,6 +91,7 @@ class Cow {
     DateTime? dateOfBirth,
     bool? isStandaloneCalf,
     String? gender,
+    String? imagePath,
   }) {
     return Cow(
       id: id ?? this.id,
@@ -103,6 +107,7 @@ class Cow {
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       isStandaloneCalf: isStandaloneCalf ?? this.isStandaloneCalf,
       gender: gender ?? this.gender,
+      imagePath: imagePath ?? this.imagePath,
     );
   }
 
@@ -211,6 +216,16 @@ class Cow {
     return 'تجاوزت موعد الولادة';
   }
 
+  int? get daysSinceLastBirth {
+    final birthEvents = history.where((e) => 
+      e['type'] == 'birth' || e['title'] == 'تسجيل ولادة'
+    ).toList();
+    if (birthEvents.isEmpty) return null;
+    birthEvents.sort((a, b) => DateTime.parse(b['date']).compareTo(DateTime.parse(a['date'])));
+    final lastBirthDate = DateTime.parse(birthEvents.first['date']);
+    return DateTime.now().difference(lastBirthDate).inDays;
+  }
+
   String get age {
     if (dateOfBirth == null) return "غير محدد";
     final now = DateTime.now();
@@ -259,13 +274,14 @@ class CowAdapter extends TypeAdapter<Cow> {
       dateOfBirth: fields[10] as DateTime?,
       isStandaloneCalf: fields[11] as bool? ?? false,
       gender: fields[12] as String?,
+      imagePath: fields[13] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Cow obj) {
     writer
-      ..writeByte(13) // Updated count
+      ..writeByte(14) // Updated count
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -291,6 +307,8 @@ class CowAdapter extends TypeAdapter<Cow> {
       ..writeByte(11)
       ..write(obj.isStandaloneCalf)
       ..writeByte(12)
-      ..write(obj.gender);
+      ..write(obj.gender)
+      ..writeByte(13)
+      ..write(obj.imagePath);
   }
 }

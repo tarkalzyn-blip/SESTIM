@@ -122,7 +122,7 @@ class _CowCardState extends ConsumerState<CowCard> {
 
                               // يمين: عمر الحمل
                               Text(
-                                'عمر الحمل: ${cow.isPostBirth ? cow.birthDate!.difference(cow.inseminationDate).inDays : cow.daysSinceInsemination} يوم',
+                                'عمر الحمل: ${_formatDuration(cow.isPostBirth ? cow.birthDate!.difference(cow.inseminationDate).inDays : cow.daysSinceInsemination)}',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -149,29 +149,29 @@ class _CowCardState extends ConsumerState<CowCard> {
                                         fontWeight: FontWeight.w600,
                                         color: Colors.grey.shade500),
                                   ),
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                                    textBaseline: TextBaseline.alphabetic,
-                                    children: [
-                                      Text(
-                                        '${cow.isPostBirth ? cow.daysSinceBirth : cow.daysSinceInsemination}',
-                                        style: TextStyle(
-                                          fontSize: 36,
-                                          fontWeight: FontWeight.w900,
-                                          color: Theme.of(context).colorScheme.onSurface,
-                                          height: 1,
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                                      textBaseline: TextBaseline.alphabetic,
+                                      children: [
+                                        Text(
+                                          '${cow.isPostBirth ? cow.daysSinceBirth : cow.daysSinceInsemination}',
+                                          style: TextStyle(
+                                            fontSize: 36,
+                                            fontWeight: FontWeight.w900,
+                                            color: Theme.of(context).colorScheme.onSurface,
+                                            height: 1,
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'يوم',
-                                        style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w700,
-                                            color: Colors.grey.shade400),
-                                      ),
-                                    ],
-                                  ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'يوم',
+                                          style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.grey.shade400),
+                                        ),
+                                      ],
+                                    ),
                                 ],
                               ),
 
@@ -401,5 +401,14 @@ class _CowCardState extends ConsumerState<CowCard> {
         ),
       ],
     );
+  }
+
+  String _formatDuration(int totalDays) {
+    if (totalDays < 30) return '$totalDays يوم';
+    final int m = totalDays ~/ 30;
+    final int d = totalDays % 30;
+    
+    if (d == 0) return '$m شهر';
+    return '$m شهر و $d يوم';
   }
 }
