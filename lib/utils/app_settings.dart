@@ -18,6 +18,9 @@ class AppSettings {
   static int get dryingDays => _box.get('dryingDays', defaultValue: 60);
   static Future<void> setDryingDays(int val) => _box.put('dryingDays', val);
 
+  static int get monitoringDays => _box.get('monitoringDays', defaultValue: 25);
+  static Future<void> setMonitoringDays(int val) => _box.put('monitoringDays', val);
+
   static int get heatCycleDays => _box.get('heatCycleDays', defaultValue: 21);
   static Future<void> setHeatCycleDays(int val) =>
       _box.put('heatCycleDays', val);

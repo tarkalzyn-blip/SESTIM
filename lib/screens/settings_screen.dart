@@ -447,6 +447,7 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
   late TextEditingController _late;
   late TextEditingController _dry;
   late TextEditingController _minInsem;
+  late TextEditingController _mon;
 
   @override
   void initState() {
@@ -458,6 +459,7 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
     );
     _dry = TextEditingController(text: AppSettings.dryingDays.toString());
     _heat = TextEditingController(text: AppSettings.heatCycleDays.toString());
+    _mon = TextEditingController(text: AppSettings.monitoringDays.toString());
     _minInsem = TextEditingController(
       text: AppSettings.minInseminationDaysAfterBirth.toString(),
     );
@@ -470,6 +472,7 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
     _late.dispose();
     _dry.dispose();
     _heat.dispose();
+    _mon.dispose();
     _minInsem.dispose();
     super.dispose();
   }
@@ -482,6 +485,7 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
         padding: const EdgeInsets.all(16),
         children: [
           _buildInput('مدة الحمل (يوم)', _preg, Icons.calendar_month),
+          _buildInput('فترة الفحص بعد التلقيح (يوم)', _mon, Icons.search, hint: 'بعدها تعتبر البقرة حاملاً تلقائياً', color: Colors.amber),
           _buildInput('بداية الجاهزية للتلقيح بعد الولادة (يوم)', _rec, Icons.child_care),
           _buildInput(
             'الحد الأدنى للتلقيح بعد الولادة (يوم)',
@@ -503,6 +507,7 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
               await AppSettings.setPregnancyDays(
                 int.tryParse(_preg.text) ?? 280,
               );
+              await AppSettings.setMonitoringDays(int.tryParse(_mon.text) ?? 25);
               await AppSettings.setRecoveryDays(int.tryParse(_rec.text) ?? 60);
               await AppSettings.setMinInseminationDaysAfterBirth(
                 int.tryParse(_minInsem.text) ?? 45,

@@ -87,7 +87,8 @@ class CalfSearchDelegate extends SearchDelegate {
   }
 
   Widget _buildCalfCard(BuildContext context, Map<String, dynamic> calf) {
-    final calfColor = Color(calf['calfColorValue']);
+    int colorValue = calf['calfColorValue'] ?? (calf['note'].toString().contains('ذكر') ? Colors.blue.toARGB32() : Colors.pink.toARGB32());
+    final calfColor = Color(colorValue);
     final isMale = calf['note'].toString().contains('ذكر');
     final isExited = calf['isExited'] == true;
 

@@ -63,9 +63,11 @@ class SummaryScreen extends ConsumerWidget {
       // Use model's built-in logic
       bool hasBirthHistory = cow.hasGivenBirth || cow.isPostBirth;
       
+      final int monitoringDays = AppSettings.monitoringDays;
+
       // --- حالات التكاثر ---
       if (cow.isInseminated && !cow.isPostBirth) {
-        if (cow.daysSinceInsemination <= 40) {
+        if (cow.daysSinceInsemination <= monitoringDays) {
           breedingMonitoring++;
           listMonitoring.add(cow);
         } else {
@@ -180,11 +182,11 @@ class SummaryScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             _buildStatusGrid(context, [
-              _StatusItemData('جاهزة للتلقيح', breedingReady, Colors.green, '🟢', listReady, _TimeInfoType.none),
+              _StatusItemData('جاهزة للتلقيح', breedingReady, Colors.green, '🟢', listReady, _TimeInfoType.daysSinceBirth),
               _StatusItemData('تحت الفحص', breedingMonitoring, Colors.amber, '🟡', listMonitoring, _TimeInfoType.daysSinceInsemination),
               _StatusItemData('حوامل', breedingPregnant, Colors.blue, '🔵', listPregnant, _TimeInfoType.monthsDaysSinceInsemination),
               _StatusItemData('تأخر بالتلقيح', breedingLate, Colors.red, '🔴', listLate, _TimeInfoType.daysSinceBirth),
-              _StatusItemData('فارغة', breedingEmpty, Colors.grey, '⚪', listEmpty, _TimeInfoType.none),
+              _StatusItemData('حديثة الولادة', breedingEmpty, Colors.grey, '⚪', listEmpty, _TimeInfoType.daysSinceBirth),
             ]),
             
             const SizedBox(height: 30),

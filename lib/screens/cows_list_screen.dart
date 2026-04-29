@@ -42,7 +42,7 @@ class CowsListScreen extends ConsumerWidget {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.add_circle_outline, size: 28),
+            icon: const Icon(Icons.add_circle, size: 28, color: Colors.green),
             tooltip: 'إضافة بقرة',
             onPressed: () {
               ref.read(editAccessProvider.notifier).runWithAccess(context, () {
@@ -104,54 +104,6 @@ class CowsListScreen extends ConsumerWidget {
                       currentFilter,
                     ),
                   ],
-                ),
-              ),
-            ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 16)),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: InkWell(
-                onTap: () {
-                  ref.read(editAccessProvider.notifier).runWithAccess(context, () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const AddEditCowScreen()),
-                    );
-                  });
-                },
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Colors.green,
-                      width: 1.5,
-                      style: BorderStyle
-                          .solid, // Note: We use solid here but simulate dashed visually, or just solid. Wait, the user asked for dashed.
-                      // Flutter standard BoxDecoration doesn't have dashed border easily without a custom painter or package.
-                      // Let's just use a nice solid green border or a dashed-looking widget if needed, but a solid 1px green border with green background is actually very close to the picture. Let's use dotted_border if available, else solid. I don't know if dotted_border is in pubspec, so I'll stick to a nice solid/translucent border for safety.
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add_circle_outline, color: Colors.green),
-                      SizedBox(width: 8),
-                      Text(
-                        'إضافة بقرة جديدة',
-                        style: TextStyle(
-                          color: Colors.green,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ),

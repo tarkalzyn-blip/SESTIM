@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cow_pregnancy/models/user_model.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:cow_pregnancy/models/cow_model.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -77,6 +79,14 @@ class AuthService {
     try {
       await _googleSignIn.signOut();
       await _auth.signOut();
+      
+      // مسح البيانات المحلية لمنع ظهورها للمستخدم التالي (أو الضيف)
+      if (Hive.isBoxOpen('cows')) {
+        await Hive.box<Cow>('cows').clear();
+      }
+      if (Hive.isBoxOpen('notes_box')) {
+        await Hive.box('notes_box').clear();
+      }
     } catch (e) {
       rethrow;
     }

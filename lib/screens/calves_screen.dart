@@ -510,7 +510,7 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                 showSearch(context: context, delegate: CalfSearchDelegate(ref)),
           ),
           IconButton(
-            icon: const Icon(Icons.add_circle_outline, size: 28),
+            icon: const Icon(Icons.add_circle, size: 28, color: Colors.blueAccent),
             tooltip: 'إضافة عجل/عجولة',
             onPressed: () => Navigator.push(
               context,
@@ -545,40 +545,6 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                     CalfFilter.exited,
                   ),
                 ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: InkWell(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AddCalfScreen()),
-              ),
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  color: Colors.blueAccent.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.blueAccent, width: 1.5),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.add_circle_outline, color: Colors.blueAccent),
-                    SizedBox(width: 8),
-                    Text(
-                      'إضافة مولود جديد',
-                      style: TextStyle(
-                        color: Colors.blueAccent,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ),
