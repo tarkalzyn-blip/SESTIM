@@ -372,7 +372,8 @@ class SettingsScreen extends ConsumerWidget {
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
-              Navigator.pop(ctx);
+              Navigator.pop(ctx);      // أغلق الـ Dialog
+              Navigator.pop(context);  // أغلق صفحة الإعدادات فوراً قبل انتظار Firebase
               await ref.read(authActionProvider.notifier).signOut();
             },
             child: const Text('خروج'),

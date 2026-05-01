@@ -47,7 +47,9 @@ class CalfSearchDelegate extends SearchDelegate {
     List<Map<String, dynamic>> calves = [];
 
     // Extract calves logic (copied from CalvesScreen)
+    // Extract calves logic (using the same logic as CalvesScreen/allCalvesProvider)
     for (var cow in cows) {
+      // 1. History-based calves
       for (var event in cow.history) {
         final title = event['title']?.toString() ?? '';
         if (title == 'تسجيل ولادة' || title == 'تسجيل ولادة سابقة') {
@@ -57,8 +59,25 @@ class CalfSearchDelegate extends SearchDelegate {
             'motherUniqueKey': cow.uniqueKey,
             'motherColor': cow.color,
             'originalEventDate': event['date'],
+            'isStandalone': false,
           });
         }
+      }
+      // 2. Standalone calves
+      if (cow.isStandaloneCalf) {
+        calves.add({
+          'calfId': cow.id,
+          'calfColorValue': cow.colorValue,
+          'date': cow.dateOfBirth?.toIso8601String() ?? cow.inseminationDate.toIso8601String(),
+          'note': cow.gender == 'male' ? 'ذكر' : 'أنثى',
+          'eventId': cow.uniqueKey,
+          'motherId': cow.motherId ?? 'غير محدد',
+          'motherUniqueKey': cow.uniqueKey,
+          'motherColor': Color(cow.motherColorValue ?? 0xFF9E9E9E),
+          'originalEventDate': cow.dateOfBirth?.toIso8601String() ?? cow.inseminationDate.toIso8601String(),
+          'isStandalone': true,
+          'uniqueKey': cow.uniqueKey,
+        });
       }
     }
 
@@ -111,12 +130,9 @@ class CalfSearchDelegate extends SearchDelegate {
         ),
         title: Row(
           children: [
-            CowIdBadge(
-              id: calf['calfId']?.toString() ?? 'بدون رقم',
-              color: calfColor,
-              fontSize: 12,
-              boxSize: 12,
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            Text(
+              '${calf['isStandalone'] == true ? "شراء" : "مولود"} #${calf['calfId'] ?? "بدون"}',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
             if (isExited) ...[
               const SizedBox(width: 8),

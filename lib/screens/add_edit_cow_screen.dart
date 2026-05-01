@@ -285,6 +285,21 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
               validator: (v) => (v == null || v.trim().isEmpty) ? 'هذا الحقل مطلوب' : null,
             ),
 
+            const SizedBox(height: 20),
+
+            // ── تاريخ ميلاد البقرة (مُنتقل إلى القسم الرئيسي للوضوح) ──────
+            CustomDatePickerField(
+              label: 'تاريخ ميلاد البقرة (اختياري)',
+              initialDate: _dateOfBirth ?? DateTime.now().subtract(const Duration(days: 1095)), // افتراضي 3 سنوات للأبقار
+              onDateSelected: (date) => setState(() => _dateOfBirth = date),
+              color: Colors.purple.shade400,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'يُستخدم لحساب عمر البقرة بدقة وتتبع تاريخها الإنتاجي.',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+
             const SizedBox(height: 24),
             const Divider(),
             const SizedBox(height: 16),
@@ -440,19 +455,6 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
                         ),
                       ),
                     ],
-                    const SizedBox(height: 24),
-                    // ── تاريخ ميلاد البقرة ───────────────────────────
-                    CustomDatePickerField(
-                      label: 'تاريخ ميلاد البقرة (اختياري)',
-                      initialDate: _dateOfBirth ?? DateTime.now().subtract(const Duration(days: 730)),
-                      onDateSelected: (date) => setState(() => _dateOfBirth = date),
-                      color: Colors.purple.shade400,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'يُستخدم لحساب عمر البقرة/البكيرة بدقة.',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                    ),
                   ],
                 ),
               ),

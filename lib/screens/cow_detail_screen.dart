@@ -152,8 +152,10 @@ class CowDetailScreen extends ConsumerWidget {
               collapseMode: CollapseMode.parallax,
               background: Hero(
                 tag: 'cow_card_${currentCow.uniqueKey}',
-                child: Stack(
-                  fit: StackFit.expand,
+                child: Material(
+                  color: currentCow.color,
+                  child: Stack(
+                    fit: StackFit.expand,
                   children: [
                     // الخلفية
                     if (currentCow.imagePath != null && currentCow.imagePath!.isNotEmpty)
@@ -292,6 +294,7 @@ class CowDetailScreen extends ConsumerWidget {
               ),
             ),
           ),
+        ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
@@ -344,7 +347,7 @@ class CowDetailScreen extends ConsumerWidget {
                                   ),
                                 ),
                                 Text(
-                                  'تجاوزت موعد الولادة بـ ${currentCow.daysSinceInsemination - 280} يوم',
+                                  'تجاوزت موعد الولادة بـ ${currentCow.daysSinceInsemination - AppSettings.pregnancyDays} يوم',
                                   style: TextStyle(
                                     color: Colors.red.withOpacity(0.8),
                                     fontSize: 13,
@@ -493,7 +496,15 @@ class CowDetailScreen extends ConsumerWidget {
     WidgetRef ref,
     Cow currentCow,
   ) {
-    DateTime date = DateTime.parse(event['date']);
+    DateTime? tempDate = DateTime.tryParse(event['date'] ?? '');
+    if (tempDate == null) {
+      try {
+        tempDate = DateFormat('yyyy-MM-dd').parse(event['date']);
+      } catch (_) {
+        tempDate = DateTime.now();
+      }
+    }
+    final DateTime date = tempDate;
     String title = event['title'] ?? 'حدث';
     String note = event['note'] ?? '';
     String eventId = event['eventId'] ?? '';
@@ -883,16 +894,29 @@ class CowDetailScreen extends ConsumerWidget {
 
     items.add(_InfoItem(Icons.timer_outlined, 'العمر الحالي', cow.age, null));
 
-    if (cow.isPostBirth) {
-      final bDate = cow.effectiveBirthDate;
+    if (cow.dateOfBirth != null) {
       items.add(
         _InfoItem(
-          Icons.child_care,
-          'تاريخ الولادة',
-          bDate != null ? DateFormat('yyyy/MM/dd').format(bDate) : 'غير محدد',
-          Colors.teal,
+          Icons.cake_outlined,
+          'تاريخ الميلاد',
+          DateFormat('yyyy/MM/dd').format(cow.dateOfBirth!),
+          Colors.orange,
         ),
       );
+    }
+
+    if (cow.isPostBirth) {
+      final bDate = cow.effectiveBirthDate;
+      if (bDate != null && bDate != cow.dateOfBirth) {
+        items.add(
+          _InfoItem(
+            Icons.child_care,
+            'تاريخ الولادة (الإنتاج)',
+            DateFormat('yyyy/MM/dd').format(bDate),
+            Colors.teal,
+          ),
+        );
+      }
       items.add(
         _InfoItem(
           Icons.hourglass_bottom,
@@ -1518,6 +1542,7 @@ class CowDetailScreen extends ConsumerWidget {
                     .updateCow(
                       currentCow.copyWith(
                         birthDate: selectedBirthDate,
+                        isInseminated: false, // <-- Fix: Reset pregnancy status after birth
                         history: newHistory,
                       ),
                     );

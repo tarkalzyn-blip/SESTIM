@@ -13,6 +13,31 @@ import 'package:cow_pregnancy/providers/theme_provider.dart';
 import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
 
 // Provider to manage and persist summary sort preference
+enum SummarySort { newest, oldest }
+enum SummaryViewMode { herdOnly, totalHeads }
+
+final summaryViewModeProvider = StateNotifierProvider<SummaryViewModeNotifier, SummaryViewMode>((ref) {
+  return SummaryViewModeNotifier();
+});
+
+class SummaryViewModeNotifier extends StateNotifier<SummaryViewMode> {
+  SummaryViewModeNotifier() : super(SummaryViewMode.herdOnly) {
+    _loadFromHive();
+  }
+
+  void _loadFromHive() {
+    final box = Hive.box('settings');
+    final savedMode = box.get('summary_view_mode_pref', defaultValue: 'herdOnly');
+    state = savedMode == 'totalHeads' ? SummaryViewMode.totalHeads : SummaryViewMode.herdOnly;
+  }
+
+  void setMode(SummaryViewMode mode) {
+    state = mode;
+    final box = Hive.box('settings');
+    box.put('summary_view_mode_pref', mode == SummaryViewMode.totalHeads ? 'totalHeads' : 'herdOnly');
+  }
+}
+
 final summarySortProvider = StateNotifierProvider<SummarySortNotifier, SummarySort>((ref) {
   return SummarySortNotifier();
 });
@@ -44,6 +69,7 @@ class SummaryScreen extends ConsumerWidget {
     final smartAlerts = ref.watch(alertsProvider);
     final syncStatus = ref.watch(syncStatusProvider);
     final birthStats = ref.watch(birthStatsProvider);
+    final viewMode = ref.watch(summaryViewModeProvider);
 
     // Filter out standalone calves for cow-related stats
     final cows = allCows.where((c) => !c.isStandaloneCalf).toList();
@@ -84,6 +110,7 @@ class SummaryScreen extends ConsumerWidget {
     List<Cow> listHeiferClose = [];
     List<Cow> listHeifersReadyForInsem = [];
     
+    final int monitoringDays = AppSettings.monitoringDays;
     final int dryingDays = AppSettings.dryingDays;
     final int pregnancyDays = AppSettings.pregnancyDays;
     final int recoveryDays = AppSettings.recoveryDays;
@@ -91,77 +118,102 @@ class SummaryScreen extends ConsumerWidget {
     final int heiferInsemAge = AppSettings.heiferInseminationAge;
 
     for (var cow in cows) {
-      // Use model's built-in logic
       bool hasBirthHistory = cow.hasGivenBirth || cow.isPostBirth;
       
-      final int monitoringDays = AppSettings.monitoringDays;
-
-      // --- حالات التكاثر ---
-      if (cow.isInseminated && !cow.isPostBirth) {
+      // ── 1. مسار حالات التكاثر (حصرية: البقرة في مكان واحد فقط) ──────────
+      if (cow.isInseminated) {
+        // مسار الملقحة: (تأخر ولادة -> تحت الفحص -> حامل)
         final daysRemaining = pregnancyDays - cow.daysSinceInsemination;
-        if (cow.daysSinceInsemination <= monitoringDays) {
-          breedingMonitoring++;
-          listMonitoring.add(cow);
-        } else if (daysRemaining < 0) {
+        
+        if (daysRemaining < 0) {
           breedingOverdue++;
           listOverdue.add(cow);
+        } else if (cow.daysSinceInsemination <= monitoringDays) {
+          breedingMonitoring++;
+          listMonitoring.add(cow);
         } else {
           breedingPregnant++;
           listPregnant.add(cow);
         }
-      } else if (cow.isPostBirth) {
-        if (cow.daysSinceBirth > lateInsemDays) {
-          breedingLate++;
-          listLate.add(cow);
-        } else if (cow.daysSinceBirth >= recoveryDays) {
-          breedingReady++;
-          listReady.add(cow);
-        } else {
-          breedingEmpty++;
-          listEmpty.add(cow);
-        }
       } else {
-        if (!hasBirthHistory) {
-          breedingReady++;
-          listReady.add(cow);
+        // مسار غير الملقحة: (حديثة ولادة -> جاهزة -> متأخرة)
+        if (hasBirthHistory) {
+          if (cow.daysSinceBirth < recoveryDays) {
+            breedingEmpty++;
+            listEmpty.add(cow);
+          } else if (cow.daysSinceBirth > lateInsemDays) {
+            breedingLate++;
+            listLate.add(cow);
+          } else {
+            breedingReady++;
+            listReady.add(cow);
+          }
         } else {
-          breedingEmpty++;
-          listEmpty.add(cow);
+          // البكيرات غير الملقحة: تدخل "جاهزة" إذا وصلت للعمر المطلوب
+          final ageInDays = cow.dateOfBirth != null 
+              ? DateTime.now().difference(cow.dateOfBirth!).inDays 
+              : 0;
+          final ageInMonths = ageInDays / 30.44;
+          
+          if (ageInMonths >= heiferInsemAge) {
+            breedingReady++;
+            listReady.add(cow);
+          }
         }
       }
 
-      // --- مراحل الإنتاج ---
+      // ── 2. مسار مراحل الإنتاج (حلوب -> مجففة -> بكيرة) ──────────────────
       if (cow.isHeifer) {
+        // مسار البكيرة
         final daysRemaining = pregnancyDays - cow.daysSinceInsemination;
-        if (cow.isInseminated && daysRemaining <= dryingDays) {
+        if (cow.isInseminated && daysRemaining < 0) {
+          // تتجاوز مرحلة الإنتاج وتظهر فقط في "تأخر بالولادة"
+        } else if (cow.isInseminated && daysRemaining <= dryingDays) {
           prodHeiferClose++;
           listHeiferClose.add(cow);
         } else {
           prodHeifer++;
           listHeifer.add(cow);
         }
-      } else if (cow.isInseminated && !cow.isPostBirth && (pregnancyDays - cow.daysSinceInsemination) <= dryingDays) {
-        prodDrying++;
-        listDrying.add(cow);
       } else {
-        prodMilking++;
-        listMilking.add(cow);
+        // مسار البقرة الكبيرة (بالغ)
+        final daysRemaining = pregnancyDays - cow.daysSinceInsemination;
+        if (cow.isInseminated && daysRemaining < 0) {
+          // تتجاوز مرحلة الإنتاج وتظهر فقط في "تأخر بالولادة"
+        } else if (cow.isInseminated && daysRemaining <= dryingDays) {
+          prodDrying++;
+          listDrying.add(cow);
+        } else {
+          prodMilking++;
+          listMilking.add(cow);
+        }
       }
     }
 
-    // --- حساب العجولات الجاهزة للتلقيح (من صفحة العجول حصراً) ---
-    final standaloneHeifers = allCows.where((c) => 
-      c.isStandaloneCalf && 
-      c.gender == 'female' && 
-      !c.isInseminated
-    ).toList();
+    final allCalves = ref.watch(allCalvesProvider);
 
-    for (var calf in standaloneHeifers) {
-      if (calf.dateOfBirth != null) {
-        final ageInMonths = DateTime.now().difference(calf.dateOfBirth!).inDays / 30;
-        if (ageInMonths >= heiferInsemAge) {
-          listHeifersReadyForInsem.add(calf);
-        }
+    for (var calfMap in allCalves) {
+      if (calfMap['isExited'] == true) continue;
+      final isMale = calfMap['note']?.toString().contains('ذكر') ?? false;
+      if (isMale) continue;
+
+      final dynamic rawDate = calfMap['date'];
+      final birthDate = rawDate is DateTime ? rawDate : DateTime.tryParse(rawDate.toString()) ?? DateTime.now();
+      final ageInDays = DateTime.now().difference(birthDate).inDays;
+      final ageInMonths = ageInDays / 30.44;
+
+      if (ageInMonths >= heiferInsemAge) {
+        final tempCow = Cow(
+          id: calfMap['calfId'] ?? 'غير معروف',
+          inseminationDate: DateTime.now(),
+          dateOfBirth: birthDate,
+          colorValue: calfMap['calfColorValue'] ?? Colors.grey.toARGB32(),
+          gender: 'female',
+          isInseminated: false,
+          isStandaloneCalf: true,
+          history: [],
+        );
+        listHeifersReadyForInsem.add(tempCow);
       }
     }
 
@@ -203,52 +255,78 @@ class SummaryScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                 color: Colors.blue.withValues(alpha: 0.1),
-                 borderRadius: BorderRadius.circular(20),
-                 border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
-              ),
-              child: Column(
-                 children: [
-                   const Text('إجمالي القطيع', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue)),
-                   const SizedBox(height: 5),
-                   Text('$totalCows بقرة', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.blue)),
-                   
-                   const Padding(
-                     padding: EdgeInsets.symmetric(vertical: 12),
-                     child: Divider(height: 1, thickness: 1, color: Color(0x332196F3)),
-                   ),
-                   Row(
-                     mainAxisAlignment: MainAxisAlignment.spaceAround,
-                     children: [
-                       _buildMiniStat('عجول ذكور', birthStats['male'] ?? 0, Colors.blue),
-                       _buildMiniStat('عجلات إناث', birthStats['female'] ?? 0, Colors.pink),
-                     ],
-                   ),
-                 ]
-              )
-            ),
-            const SizedBox(height: 30),
             
+            // --- Mode Selector (Toggle) ---
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildModeToggleBtn(
+                      context,
+                      ref,
+                      title: 'تفاصيل البقر',
+                      mode: SummaryViewMode.herdOnly,
+                      isActive: viewMode == SummaryViewMode.herdOnly,
+                      activeColor: Colors.blue,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () {
+                      final current = ref.read(summaryViewModeProvider);
+                      final nextMode = current == SummaryViewMode.herdOnly ? SummaryViewMode.totalHeads : SummaryViewMode.herdOnly;
+                      ref.read(summaryViewModeProvider.notifier).setMode(nextMode);
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.sync, size: 20, color: Colors.grey.shade400),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildModeToggleBtn(
+                      context,
+                      ref,
+                      title: 'العدد الكلي',
+                      mode: SummaryViewMode.totalHeads,
+                      isActive: viewMode == SummaryViewMode.totalHeads,
+                      activeColor: Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // --- Dynamic Header Card ---
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: viewMode == SummaryViewMode.herdOnly
+                  ? _buildHerdOnlyCard(totalCows, birthStats)
+                  : _buildTotalHeadsCard(totalCows, birthStats['active'] ?? 0),
+            ),
+            
+            const SizedBox(height: 30),
             const Text(
               'حالات التكاثر',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blueGrey),
             ),
             const SizedBox(height: 16),
             _buildStatusGrid(context, ref, [
-              _StatusItemData('جاهزة للتلقيح', breedingReady, Colors.green, '🟢', listReady, _TimeInfoType.daysSinceBirth),
+              _StatusItemData('جاهزة للتلقيح', breedingReady, Colors.green, '🟢', listReady, _TimeInfoType.daysSinceBirthOnly),
               _StatusItemData('تحت الفحص', breedingMonitoring, Colors.amber, '🟡', listMonitoring, _TimeInfoType.daysSinceInsemination),
               _StatusItemData('حوامل', breedingPregnant, Colors.blue, '🔵', listPregnant, _TimeInfoType.monthsDaysSinceInsemination),
               _StatusItemData('تأخر بالولادة', breedingOverdue, Colors.deepOrange, '⚠️', listOverdue, _TimeInfoType.daysRemainingUntilBirth),
-              _StatusItemData('تأخر بالتلقيح', breedingLate, Colors.red, '🔴', listLate, _TimeInfoType.daysSinceBirth),
-              _StatusItemData('حديثة الولادة', breedingEmpty, Colors.grey, '⚪', listEmpty, _TimeInfoType.daysSinceBirth),
+              _StatusItemData('تأخر بالتلقيح', breedingLate, Colors.red, '🔴', listLate, _TimeInfoType.daysSinceBirthOnly),
+              _StatusItemData('حديثة الولادة', breedingEmpty, Colors.grey, '⚪', listEmpty, _TimeInfoType.daysSinceBirthOnly),
             ]),
             
             const SizedBox(height: 30),
-            
             const Text(
               'مراحل الإنتاج',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blueGrey),
@@ -262,7 +340,6 @@ class SummaryScreen extends ConsumerWidget {
             ]),
             
             const SizedBox(height: 30),
-
             const Text(
               'إدارة العجولات',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blueGrey),
@@ -342,7 +419,7 @@ class SummaryScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 100), // Space for bottom bar
+            const SizedBox(height: 100),
           ],
         ),
       ),
@@ -354,30 +431,12 @@ class SummaryScreen extends ConsumerWidget {
     IconData icon;
     
     switch (alert.type) {
-      case AlertType.birth:
-        cardColor = Colors.orange;
-        icon = Icons.child_friendly;
-        break;
-      case AlertType.heat:
-        cardColor = Colors.amber;
-        icon = Icons.favorite_border;
-        break;
-      case AlertType.lateInsemination:
-        cardColor = Colors.redAccent;
-        icon = Icons.warning_amber_rounded;
-        break;
-      case AlertType.drying:
-        cardColor = Colors.blue;
-        icon = Icons.opacity_outlined;
-        break;
-      case AlertType.calfVaccine:
-        cardColor = Colors.teal;
-        icon = Icons.vaccines;
-        break;
-      case AlertType.recovery:
-        cardColor = Colors.green;
-        icon = Icons.health_and_safety;
-        break;
+      case AlertType.birth: cardColor = Colors.orange; icon = Icons.child_friendly; break;
+      case AlertType.heat: cardColor = Colors.amber; icon = Icons.favorite_border; break;
+      case AlertType.lateInsemination: cardColor = Colors.redAccent; icon = Icons.warning_amber_rounded; break;
+      case AlertType.drying: cardColor = Colors.blue; icon = Icons.opacity_outlined; break;
+      case AlertType.calfVaccine: cardColor = Colors.teal; icon = Icons.vaccines; break;
+      case AlertType.recovery: cardColor = Colors.green; icon = Icons.health_and_safety; break;
     }
 
     final cowColor = Color(alert.cowColorValue);
@@ -388,18 +447,12 @@ class SummaryScreen extends ConsumerWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          splashColor: cardColor.withValues(alpha: 0.25),
-          highlightColor: cardColor.withValues(alpha: 0.15),
           onTap: () {
             try {
               final cow = cows.firstWhere((c) => c.uniqueKey == alert.relatedCowKey);
-              Navigator.push(context, MaterialPageRoute(
-                builder: (_) => CowDetailScreen(cow: cow),
-              ));
+              Navigator.push(context, MaterialPageRoute(builder: (_) => CowDetailScreen(cow: cow)));
             } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('البقرة غير موجودة!')),
-              );
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('البقرة غير موجودة!')));
             }
           },
           child: Ink(
@@ -410,66 +463,43 @@ class SummaryScreen extends ConsumerWidget {
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: cardColor.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: cardColor.withValues(alpha: 0.2), shape: BoxShape.circle),
+                    child: Icon(icon, color: cardColor, size: 28),
                   ),
-                  child: Icon(icon, color: cardColor, size: 28),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              alert.title.replaceAll('البقرة رقم', '').replaceAll('البقرة', '').trim(),
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: cardColor),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                alert.title.replaceAll('البقرة رقم', '').replaceAll('البقرة', '').trim(),
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: cardColor),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          CowIdBadge(
-                            id: alert.cowId,
-                            color: cowColor,
-                            fontSize: 14,
-                            boxSize: 15,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        alert.description.replaceAll('البقرة رقم', '').replaceAll('البقرة', '').replaceAll('#${alert.cowId}', '').trim(),
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(Icons.arrow_forward_ios, size: 12, color: cardColor),
-                          const SizedBox(width: 4),
-                          Text('اضغط لاتخاذ إجراء', style: TextStyle(fontSize: 12, color: cardColor, fontWeight: FontWeight.bold)),
-                        ],
-                      )
-                    ],
+                            CowIdBadge(id: alert.cowId, color: cowColor, fontSize: 14, boxSize: 15),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(alert.description.replaceAll('البقرة رقم', '').replaceAll('البقرة', '').trim(), style: const TextStyle(fontSize: 14)),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-        ),           
-      ),             
-    );               
+      ),
+    );
   }
 
   Widget _buildCalfStatRow(String title, int count, IconData icon, Color color) {
@@ -500,25 +530,91 @@ class SummaryScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildMiniStat(String label, int count, Color color) {
+  Widget _buildModeToggleBtn(BuildContext context, WidgetRef ref, {required String title, required SummaryViewMode mode, required bool isActive, required Color activeColor}) {
+    return InkWell(
+      onTap: () => ref.read(summaryViewModeProvider.notifier).setMode(mode),
+      borderRadius: BorderRadius.circular(15),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isActive ? activeColor : Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: isActive ? activeColor : Colors.grey.shade300, width: 1.5),
+          boxShadow: isActive ? [BoxShadow(color: activeColor.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))] : [],
+        ),
+        child: Text(
+          title,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: isActive ? Colors.white : Colors.grey.shade600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHerdOnlyCard(int totalCows, Map<String, dynamic> birthStats) {
+    return Container(
+      key: const ValueKey('herd_card'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.blue.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        children: [
+          const Text('إجمالي القطيع', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue)),
+          const SizedBox(height: 5),
+          Text('$totalCows بقرة', style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: Colors.blue)),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1, thickness: 1, color: Color(0x222196F3)),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildMiniStat('عجول ذكور', birthStats['male'] ?? 0, Colors.blue),
+              _buildMiniStat('عجلات إناث', birthStats['female'] ?? 0, Colors.pink),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTotalHeadsCard(int totalCows, int totalCalves) {
+    final total = totalCows + totalCalves;
+    return Container(
+      key: const ValueKey('total_card'),
+      width: double.infinity,
+      // زيادة الـ padding ليتساوى الارتفاع مع الكرت الآخر
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.green.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.green.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text('إجمالي رؤوس المزرعة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
+          const SizedBox(height: 10),
+          Text('$total رأس', style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w900, color: Colors.green)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniStat(String label, int value, Color color) {
     return Column(
       children: [
-        Text(
-          '$count',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w900,
-            color: color,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: color.withValues(alpha: 0.8),
-          ),
-        ),
+        Text('$value', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: color)),
+        Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color.withValues(alpha: 0.7))),
       ],
     );
   }
@@ -529,215 +625,91 @@ class SummaryScreen extends ConsumerWidget {
       builder: (context) => Consumer(
         builder: (context, ref, _) {
           final currentSort = ref.watch(summarySortProvider);
-          
-          // منطق الترتيب
           final sortedCows = List<Cow>.from(cows);
           sortedCows.sort((a, b) {
             final valA = _getSortValue(a, timeInfoType);
             final valB = _getSortValue(b, timeInfoType);
-            if (currentSort == SummarySort.newest) {
-              return valB.compareTo(valA);
-            } else {
-              return valA.compareTo(valB);
-            }
+            return currentSort == SummarySort.newest ? valB.compareTo(valA) : valA.compareTo(valB);
           });
 
           return AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        titlePadding: EdgeInsets.zero,
-        title: Container(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
-          decoration: BoxDecoration(
-            color: themeColor.withValues(alpha: 0.1),
-            borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: themeColor.withValues(alpha: 0.2), shape: BoxShape.circle),
-                child: Icon(Icons.list_alt_rounded, color: themeColor, size: 20),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            titlePadding: EdgeInsets.zero,
+            title: Container(
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+              decoration: BoxDecoration(
+                color: themeColor.withValues(alpha: 0.1),
+                borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: 18),
-                ),
-              ),
-              PopupMenuButton<SummarySort>(
-                icon: Icon(Icons.sort, color: themeColor),
-                onSelected: (sort) {
-                  ref.read(summarySortProvider.notifier).setSort(sort);
-                },
-                itemBuilder: (context) => const [
-                  PopupMenuItem(
-                    value: SummarySort.newest,
-                    child: Text('الأحدث أولاً'),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: themeColor.withValues(alpha: 0.2), shape: BoxShape.circle),
+                    child: Icon(Icons.list_alt_rounded, color: themeColor, size: 20),
                   ),
-                  PopupMenuItem(
-                    value: SummarySort.oldest,
-                    child: Text('الأقدم أولاً'),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(title, style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: 18))),
+                  PopupMenuButton<SummarySort>(
+                    icon: Icon(Icons.sort, color: themeColor),
+                    onSelected: (sort) => ref.read(summarySortProvider.notifier).setSort(sort),
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(value: SummarySort.newest, child: Text('الأحدث أولاً')),
+                      PopupMenuItem(value: SummarySort.oldest, child: Text('الأقدم أولاً')),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: sortedCows.isEmpty 
-            ? const Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: Text('لا يوجد أبقار في هذه القائمة', textAlign: TextAlign.center),
-              )
-            : ListView.separated(
-                shrinkWrap: true,
-                itemCount: sortedCows.length,
-                separatorBuilder: (context, index) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final cow = sortedCows[index];
-                  final timeParts = _buildTimeParts(cow, timeInfoType);
-                  final String timeTitle = timeParts.$1;
-                  final String timeValue = timeParts.$2;
-
-                  return InkWell(
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(context, MaterialPageRoute(
-                        builder: (_) => CowDetailScreen(cow: cow),
-                      ));
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                      child: Row(
-                        children: [
-                          // الجانب الأيسر: العنوان والقيمة
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  timeTitle.isNotEmpty ? timeTitle : 'لا توجد بيانات',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: themeColor,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: sortedCows.isEmpty 
+                ? const Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Text('لا يوجد أبقار في هذه القائمة', textAlign: TextAlign.center))
+                : ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: sortedCows.length,
+                    separatorBuilder: (context, index) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final cow = sortedCows[index];
+                      final timeParts = _buildTimeParts(cow, timeInfoType);
+                      return InkWell(
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => CowDetailScreen(cow: cow)));
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(timeParts.$1.isNotEmpty ? timeParts.$1 : 'لا توجد بيانات', style: TextStyle(fontSize: 13, color: themeColor, fontWeight: FontWeight.bold)),
+                                    if (timeParts.$2.isNotEmpty) ...[
+                                      const SizedBox(height: 3),
+                                      Text(timeParts.$2, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+                                    ],
+                                  ],
                                 ),
-                                if (timeValue.isNotEmpty) ...[  
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    timeValue,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
+                              ),
+                              CowIdBadge(id: cow.id, color: cow.color, fontSize: 14, boxSize: 15),
+                              const SizedBox(width: 6),
+                              Icon(Icons.arrow_forward_ios, size: 13, color: Colors.grey.shade400),
+                            ],
                           ),
-                          // الجانب الأيمن: شارة الرقم واللون + سهم
-                          CowIdBadge(
-                            id: cow.id,
-                            color: cow.color,
-                            fontSize: 14,
-                            boxSize: 15,
-                          ),
-                          const SizedBox(width: 6),
-                          Icon(Icons.arrow_forward_ios, size: 13, color: Colors.grey.shade400),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إغلاق', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      );
-    },
-  ),
-);
-}
-
-  // دالة مساعدة للحصول على قيمة الترتيب بناءً على نوع التوقيت
-  int _getSortValue(Cow cow, _TimeInfoType type) {
-    switch (type) {
-      case _TimeInfoType.daysSinceBirth:
-        if (cow.birthDate != null) return DateTime.now().difference(cow.birthDate!).inDays;
-        return cow.daysSinceBirth;
-      case _TimeInfoType.daysSinceInsemination:
-      case _TimeInfoType.monthsDaysSinceInsemination:
-        return cow.daysSinceInsemination;
-      case _TimeInfoType.daysRemainingUntilBirth:
-        return cow.daysSinceInsemination; // الترتيب حسب مدة الحمل يعطي نفس النتيجة
-      default:
-        try {
-          return int.parse(cow.id.replaceAll(RegExp(r'[^0-9]'), ''));
-        } catch (_) {
-          return 0;
-        }
-    }
-  }
-
-  // إرجاع (التسمية، القيمة) كزوج منفصل
-  (String, String) _buildTimeParts(Cow cow, _TimeInfoType type) {
-    switch (type) {
-      case _TimeInfoType.daysSinceBirth:
-        final bDate = cow.birthDate ?? cow.dateOfBirth;
-        if (bDate == null) return ('', '');
-        final daysTotal = DateTime.now().difference(bDate).inDays;
-        
-        if (cow.birthDate != null) {
-          return ('منذ الولادة', '$daysTotal يوم');
-        } else {
-          // تفصيل العمر للعجولة: سنة، شهر، يوم
-          final years = daysTotal ~/ 365;
-          final months = (daysTotal % 365) ~/ 30;
-          final days = (daysTotal % 365) % 30;
-          
-          List<String> parts = [];
-          if (years > 0) parts.add('$years سنة');
-          if (months > 0) parts.add('$months شهر');
-          if (days > 0 || parts.isEmpty) parts.add('$days يوم');
-          
-          return ('العمر', parts.join(' و '));
-        }
-
-      case _TimeInfoType.daysSinceInsemination:
-        if (!cow.isInseminated) return ('', '');
-        final days = cow.daysSinceInsemination;
-        return ('منذ التلقيح', '$days يوم');
-
-      case _TimeInfoType.monthsDaysSinceInsemination:
-        if (!cow.isInseminated) return ('', '');
-        final days = cow.daysSinceInsemination;
-        final months = days ~/ 30;
-        final remaining = days % 30;
-        if (months > 0) {
-          return ('منذ التلقيح', '$months شهر و$remaining يوم');
-        }
-        return ('منذ التلقيح', '$days يوم');
-
-      case _TimeInfoType.daysRemainingUntilBirth:
-        if (!cow.isInseminated) return ('', '');
-        final daysSinceInsemination = cow.daysSinceInsemination;
-        final pregDays = AppSettings.pregnancyDays;
-        final daysRemaining = pregDays - daysSinceInsemination;
-        if (daysRemaining < 0) {
-          return ('متأخرة عن الولادة', '${-daysRemaining} يوم');
-        }
-        return ('باقي للولادة', '$daysRemaining يوم');
-
-      case _TimeInfoType.none:
-        return ('', '');
-    }
+                        ),
+                      );
+                    },
+                  ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('إغلاق', style: TextStyle(fontWeight: FontWeight.bold))),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   Widget _buildStatusGrid(BuildContext context, WidgetRef ref, List<_StatusItemData> items) {
@@ -745,13 +717,9 @@ class SummaryScreen extends ConsumerWidget {
       spacing: 12,
       runSpacing: 12,
       children: items.map((item) {
-        final isFiveItems = items.length == 5;
-        final isThreeItems = items.length == 3;
         final isLastItem = item == items.last;
         double width = (MediaQuery.of(context).size.width - 40 - 12) / 2;
-        if ((isFiveItems || isThreeItems) && isLastItem) {
-          width = MediaQuery.of(context).size.width - 40;
-        }
+        if ((items.length % 2 != 0) && isLastItem) width = MediaQuery.of(context).size.width - 40;
 
         return InkWell(
           onTap: () => _showCowsListDialog(context, ref, item.title, item.cows, item.color, item.timeInfoType),
@@ -762,47 +730,110 @@ class SummaryScreen extends ConsumerWidget {
               color: item.color.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: item.color.withValues(alpha: 0.3), width: 1.5),
-              boxShadow: [
-                BoxShadow(color: item.color.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+              boxShadow: [BoxShadow(color: item.color.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(item.emoji, style: const TextStyle(fontSize: 24)),
+                    const SizedBox(width: 8),
+                    Text(item.count.toString(), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: item.color, height: 1)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(item.title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8)), textAlign: TextAlign.center),
               ],
             ),
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(item.emoji, style: const TextStyle(fontSize: 24)),
-                  const SizedBox(width: 8),
-                  Text(
-                    item.count.toString(),
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      color: item.color,
-                      height: 1,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                item.title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
           ),
-        ),
-      );
-    }).toList(),
-  );
-}
+        );
+      }).toList(),
+    );
+  }
+
+  int _getSortValue(Cow cow, _TimeInfoType type) {
+    switch (type) {
+      case _TimeInfoType.daysSinceBirth: 
+      case _TimeInfoType.daysSinceBirthOnly:
+        if (cow.isPostBirth) return cow.daysSinceBirth;
+        if (cow.isInseminated) return cow.daysSinceInsemination;
+        if (cow.dateOfBirth != null) return DateTime.now().difference(cow.dateOfBirth!).inDays;
+        return 0;
+      case _TimeInfoType.daysSinceInsemination:
+      case _TimeInfoType.monthsDaysSinceInsemination:
+      case _TimeInfoType.daysRemainingUntilBirth:
+        if (!cow.isInseminated && cow.dateOfBirth != null) {
+          return DateTime.now().difference(cow.dateOfBirth!).inDays;
+        }
+        return cow.daysSinceInsemination;
+      default: return 0;
+    }
+  }
+
+  (String, String) _buildTimeParts(Cow cow, _TimeInfoType type) {
+    // If we expect insemination data but cow isn't inseminated, fallback to Age
+    bool needsInsemFallback = (type == _TimeInfoType.daysSinceInsemination || 
+                               type == _TimeInfoType.monthsDaysSinceInsemination || 
+                               type == _TimeInfoType.daysRemainingUntilBirth) && !cow.isInseminated;
+
+    if (needsInsemFallback) {
+      return ('العمر', cow.age);
+    }
+
+    switch (type) {
+      case _TimeInfoType.daysSinceBirth: 
+        // الأولوية الأولى: أيام الحليب (منذ الولادة) - كما طلبت للفئة الحلوب
+        if (cow.isPostBirth) {
+          final months = (cow.daysSinceBirth / 30).floor();
+          final days = cow.daysSinceBirth % 30;
+          final timeStr = months > 0 ? '$months شهر و $days يوم' : '$days يوم';
+          return ('منذ الولادة', timeStr);
+        }
+        // الأولوية الثانية: إذا لم تلد بعد ولكنها ملقحة، أظهر أيام التلقيح
+        if (cow.isInseminated) {
+          final months = (cow.daysSinceInsemination / 30).floor();
+          final days = cow.daysSinceInsemination % 30;
+          final timeStr = months > 0 ? '$months شهر و $days يوم' : '$days يوم';
+          return ('منذ التلقيح', timeStr);
+        }
+        // الأولوية الثالثة: العمر
+        if (cow.dateOfBirth != null) {
+          return ('العمر', cow.age);
+        }
+        final fallbackMonths = (cow.daysSinceInsemination / 30).floor();
+        final fallbackDays = cow.daysSinceInsemination % 30;
+        final fallbackStr = fallbackMonths > 0 ? '$fallbackMonths شهر و $fallbackDays يوم' : '$fallbackDays يوم';
+        return ('منذ التلقيح', fallbackStr);
+
+      case _TimeInfoType.daysSinceBirthOnly:
+        if (cow.isPostBirth) {
+          return ('منذ الولادة', '${cow.daysSinceBirth} يوم');
+        }
+        if (cow.isInseminated) {
+          return ('منذ التلقيح', '${cow.daysSinceInsemination} يوم');
+        }
+        if (cow.dateOfBirth != null) {
+          return ('العمر', cow.age);
+        }
+        return ('منذ التلقيح', '${cow.daysSinceInsemination} يوم');
+
+      case _TimeInfoType.daysSinceInsemination: 
+        return ('منذ التلقيح', '${cow.daysSinceInsemination} يوم');
+
+      case _TimeInfoType.monthsDaysSinceInsemination:
+        final months = (cow.daysSinceInsemination / 30).floor();
+        final days = cow.daysSinceInsemination % 30;
+        return ('مدة الحمل', '$months شهر و $days يوم');
+
+      case _TimeInfoType.daysRemainingUntilBirth:
+        final remaining = AppSettings.pregnancyDays - cow.daysSinceInsemination;
+        return remaining < 0 ? ('متأخرة عن الولادة', '${-remaining} يوم') : ('باقي للولادة', '$remaining يوم');
+        
+      default: return ('', '');
+    }
+  }
 }
 
 class _StatusItemData {
@@ -818,12 +849,8 @@ class _StatusItemData {
 enum _TimeInfoType {
   none,
   daysSinceBirth,
+  daysSinceBirthOnly,
   daysSinceInsemination,
   monthsDaysSinceInsemination,
   daysRemainingUntilBirth,
-}
-
-enum SummarySort {
-  newest,
-  oldest,
 }

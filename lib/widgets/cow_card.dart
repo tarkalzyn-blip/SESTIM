@@ -216,6 +216,8 @@ class _CowCardState extends ConsumerState<CowCard> {
   }
 
   void _showDeleteDialog(BuildContext context) {
+    // نحفظ context الشاشة الحاملة قبل فتح الـ Dialog
+    final parentContext = context;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -228,8 +230,10 @@ class _CowCardState extends ConsumerState<CowCard> {
               child: const Text('إلغاء')),
           TextButton(
             onPressed: () {
+              Navigator.pop(ctx); // أغلق الـ Dialog أولاً
               ref.read(cowProvider.notifier).deleteCow(widget.cow.uniqueKey);
-              Navigator.pop(ctx);
+              // إذا كانت هذه البطاقة مفتوحة داخل شاشة تفاصيل، أغلقها أيضاً
+              if (parentContext.mounted) Navigator.maybePop(parentContext);
             },
             child: const Text('حذف', style: TextStyle(color: Colors.red)),
           ),

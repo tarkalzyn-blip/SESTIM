@@ -612,7 +612,7 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'مولود #${calfId ?? "بدون"}',
+                                        '${calf['isStandalone'] == true ? "شراء" : "مولود"} #${calfId ?? "بدون"}',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 16,

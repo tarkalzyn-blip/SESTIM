@@ -668,8 +668,8 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
 
             // Details
             _buildDetailCard(
-              Icons.cake,
-              'تاريخ الولادة',
+              _currentCalfData['isStandalone'] == true ? Icons.shopping_cart_outlined : Icons.cake,
+              _currentCalfData['isStandalone'] == true ? 'تاريخ الشراء' : 'تاريخ الولادة',
               DateFormat('yyyy/MM/dd').format(_currentCalfData['date']),
             ),
             _buildDetailCard(

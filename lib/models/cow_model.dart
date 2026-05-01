@@ -192,13 +192,15 @@ class Cow {
   });
 
   bool get isHeifer {
-    // الأولوية للتحديد اليدوي إذا وجد
-    if (isManualCow == true) return false; // إذا حُددت كبقرة يدوياً → ليست بكيرة
-    if (isManualCow == false) return true; // إذا حُددت كبكيرة يدوياً → هي بكيرة
+    // الأولوية القصوى: إذا كانت البقرة قد ولدت، فهي بقرة بالغ (حلوب/مجففة) ولا يمكن أن تكون بكيرة أبداً
+    if (hasGivenBirth || isPostBirth) return false;
+
+    // الأولوية الثانية للتحديد اليدوي
+    if (isManualCow == true) return false; // حُددت كبقرة يدوياً
+    if (isManualCow == false) return true; // حُددت كبكيرة ولم تلد بعد
 
     // التوافق مع السجلات القديمة
     if (gender == 'male') return false;
-    if (hasGivenBirth) return false;
     if (isStandaloneCalf) return false;
 
     return true;
@@ -264,22 +266,25 @@ class Cow {
   String get age {
     if (dateOfBirth == null) return "غير محدد";
     final now = DateTime.now();
-    final difference = now.difference(dateOfBirth!);
-    final days = difference.inDays;
-
-    if (days < 30) return '$days يوم';
-    if (days < 365) {
-      final months = days ~/ 30;
-      final remainingDays = days % 30;
-      String result = '$months شهر';
-      if (remainingDays > 0) result += ' و $remainingDays يوم';
-      return result;
+    final diff = now.difference(dateOfBirth!);
+    
+    final int years = diff.inDays ~/ 365;
+    final int remainingDaysAfterYears = diff.inDays % 365;
+    final int months = remainingDaysAfterYears ~/ 30;
+    final int days = remainingDaysAfterYears % 30;
+    
+    List<String> parts = [];
+    if (years > 0) {
+      parts.add(years == 1 ? '1 سنة' : '$years سنة');
     }
-    final years = days ~/ 365;
-    final remainingMonths = (days % 365) ~/ 30;
-    String result = '$years سنة';
-    if (remainingMonths > 0) result += ' و $remainingMonths شهر';
-    return result;
+    if (months > 0) {
+      parts.add('$months شهر');
+    }
+    if (days > 0 || (years == 0 && months == 0)) {
+      parts.add('$days يوم');
+    }
+    
+    return parts.isEmpty ? '0 يوم' : parts.join(' و ');
   }
 
   String get uniqueKey => "${id}_$colorValue";
