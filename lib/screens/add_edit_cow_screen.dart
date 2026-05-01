@@ -206,18 +206,8 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
       });
     }
 
-    // أي بقرة تُضاف من صفحة الأبقار → تُعتبر بقرة والدة
-    bool alreadyHasBirth = history.any((e) {
-      final t = e['title']?.toString() ?? '';
-      return t.contains('ولادة') || t.contains('مولود');
-    });
-    if (!_isEditing && !alreadyHasBirth) {
-      history.add({
-        'title': 'ولادة سابقة (خارج النظام)',
-        'date': (_dateOfBirth ?? DateTime.now()).subtract(const Duration(days: 30)).toIso8601String(),
-        'note': 'تم تسجيل البقرة كوالدة سابقاً عند الإضافة من صفحة الأبقار',
-      });
-    }
+    // أي بقرة تُضاف من صفحة الأبقار → تُعتبر بقرة (Milking) ولا تحتاج لولادة وهمية
+    bool isManualCow = !_isEditing; // true if new addition from this screen
 
     final cow = Cow(
       id: _idController.text.trim(),
@@ -228,9 +218,10 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
       bullId: _bullIdController.text.trim().isEmpty ? null : _bullIdController.text.trim(),
       motherId: _motherIdController.text.trim().isEmpty ? null : _motherIdController.text.trim(),
       motherColorValue: _selectedMotherColorValue,
-      dateOfBirth: _dateOfBirth,
+      dateOfBirth: _dateOfBirth, // حفظ تاريخ الميلاد
+      isStandaloneCalf: widget.cow?.isStandaloneCalf ?? false,
       history: history,
-      isStandaloneCalf: false,
+      isManualCow: isManualCow,
     );
 
     final cows = ref.read(cowProvider);
@@ -292,14 +283,6 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
                 prefixIcon: const Icon(Icons.tag),
               ),
               validator: (v) => (v == null || v.trim().isEmpty) ? 'هذا الحقل مطلوب' : null,
-            ),
-
-            const SizedBox(height: 16),
-
-            CustomDatePickerField(
-              label: 'تاريخ ميلاد البقرة (اختياري)',
-              initialDate: _dateOfBirth ?? DateTime.now().subtract(const Duration(days: 730)),
-              onDateSelected: (date) => setState(() => _dateOfBirth = date),
             ),
 
             const SizedBox(height: 24),
@@ -457,6 +440,19 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
                         ),
                       ),
                     ],
+                    const SizedBox(height: 24),
+                    // ── تاريخ ميلاد البقرة ───────────────────────────
+                    CustomDatePickerField(
+                      label: 'تاريخ ميلاد البقرة (اختياري)',
+                      initialDate: _dateOfBirth ?? DateTime.now().subtract(const Duration(days: 730)),
+                      onDateSelected: (date) => setState(() => _dateOfBirth = date),
+                      color: Colors.purple.shade400,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'يُستخدم لحساب عمر البقرة/البكيرة بدقة.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
                   ],
                 ),
               ),

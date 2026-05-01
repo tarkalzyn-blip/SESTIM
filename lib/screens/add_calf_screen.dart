@@ -45,6 +45,7 @@ class _AddCalfScreenState extends ConsumerState<AddCalfScreen> {
       gender: _gender,
       isStandaloneCalf: true,
       isInseminated: false,
+      isManualCow: false, // مضافة كبكيرة
       motherId: _motherIdController.text.trim().isEmpty ? null : _motherIdController.text.trim(),
       motherColorValue: _selectedMotherColorValue,
       history: [

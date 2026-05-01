@@ -14,27 +14,37 @@ class CowNotifier extends Notifier<List<Cow>> {
   final FirestoreService _firestore = FirestoreService();
   StreamSubscription<List<Cow>>? _subscription;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
-  bool _isInitialized = false;
   bool _wasOffline = false;
 
   @override
   List<Cow> build() {
-    final localCows = Hive.box<Cow>('cows').values.toList();
-    
-    // Efficiently manage cloud listening
-    if (!_isInitialized) {
-      _isInitialized = true;
-      Future.microtask(() {
-        _startListeningToCloud();
-        _startConnectivityListener();
-      });
-    }
-    
+    // Watch auth state - this causes the provider to rebuild on login/logout
+    final user = ref.watch(appUserProvider);
+
     ref.onDispose(() {
       _subscription?.cancel();
       _connectivitySubscription?.cancel();
+      _subscription = null;
+      _connectivitySubscription = null;
     });
-    
+
+    if (user == null) {
+      // User logged out: cancel subscriptions and return empty list immediately
+      _subscription?.cancel();
+      _subscription = null;
+      _connectivitySubscription?.cancel();
+      _connectivitySubscription = null;
+      return [];
+    }
+
+    // User logged in: load local data then start cloud sync
+    final localCows = Hive.box<Cow>('cows').values.toList();
+
+    Future.microtask(() {
+      _startListeningToCloud();
+      _startConnectivityListener();
+    });
+
     return localCows;
   }
 

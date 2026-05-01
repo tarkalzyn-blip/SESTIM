@@ -86,42 +86,39 @@ class NotesNotifier extends Notifier<List<NoteModel>> {
   StreamSubscription<List<Map<String, dynamic>>>? _cloudSubscription;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _wasOffline = false;
-  String? _listeningForUserId;
-
   @override
   List<NoteModel> build() {
-    // Load local notes from Hive only — do NOT watch appUserProvider here
-    // to avoid rebuild loops. We listen for auth changes separately.
+    // Watch auth state - this causes the provider to rebuild on login/logout
+    final user = ref.watch(appUserProvider);
+
+    ref.onDispose(() {
+      _cloudSubscription?.cancel();
+      _connectivitySubscription?.cancel();
+      _cloudSubscription = null;
+      _connectivitySubscription = null;
+    });
+
+    if (user == null) {
+      // User logged out: cancel subscriptions and return empty list immediately
+      _cloudSubscription?.cancel();
+      _cloudSubscription = null;
+      _connectivitySubscription?.cancel();
+      _connectivitySubscription = null;
+      return [];
+    }
+
+    // User logged in: load local data then start cloud sync
     final box = Hive.box('notes_box');
     final localNotes = box.values
         .map((e) => NoteModel.fromMap(Map<String, dynamic>.from(e)))
         .toList();
 
-    // Start listening after the first build
-    Future.microtask(() => _initSync());
-
-    ref.onDispose(() {
-      _cloudSubscription?.cancel();
-      _connectivitySubscription?.cancel();
+    Future.microtask(() {
+      _startCloudListener();
+      _startConnectivityListener();
     });
 
     return localNotes;
-  }
-
-  /// Called once after build — sets up auth watcher & connectivity
-  void _initSync() {
-    // Watch auth state changes via a separate stream (not inside build)
-    _firestore.authStateChanges.listen((uid) {
-      if (uid != null && uid != _listeningForUserId) {
-        _listeningForUserId = uid;
-        _startCloudListener();
-        _startConnectivityListener();
-      } else if (uid == null) {
-        _listeningForUserId = null;
-        _cloudSubscription?.cancel();
-        _cloudSubscription = null;
-      }
-    });
   }
 
   void _startCloudListener() {

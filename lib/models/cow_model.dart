@@ -17,6 +17,7 @@ class Cow {
   final bool isStandaloneCalf; // New: True if it's currently managed in calves screen
   final String? gender; // New: 'male' or 'female'
   final String? imagePath; // مسار صورة البقرة
+  final bool? isManualCow; // جديد: لتحديد يدوياً هل هي بقرة (true) أم بكيرة (false)
 
   Cow({
     required this.id,
@@ -33,6 +34,7 @@ class Cow {
     this.isStandaloneCalf = false,
     this.gender,
     this.imagePath,
+    this.isManualCow,
   });
 
   Map<String, dynamic> toMap() {
@@ -51,6 +53,7 @@ class Cow {
       'isStandaloneCalf': isStandaloneCalf,
       'gender': gender,
       'imagePath': imagePath,
+      'isManualCow': isManualCow,
     };
   }
 
@@ -74,6 +77,7 @@ class Cow {
       isStandaloneCalf: map['isStandaloneCalf'] ?? false,
       gender: map['gender'],
       imagePath: map['imagePath'],
+      isManualCow: map['isManualCow'],
     );
   }
 
@@ -92,6 +96,7 @@ class Cow {
     bool? isStandaloneCalf,
     String? gender,
     String? imagePath,
+    bool? isManualCow,
   }) {
     return Cow(
       id: id ?? this.id,
@@ -108,6 +113,7 @@ class Cow {
       isStandaloneCalf: isStandaloneCalf ?? this.isStandaloneCalf,
       gender: gender ?? this.gender,
       imagePath: imagePath ?? this.imagePath,
+      isManualCow: isManualCow ?? this.isManualCow,
     );
   }
 
@@ -124,14 +130,44 @@ class Cow {
     return today.difference(insem).inDays;
   }
 
-  bool get isPostBirth =>
-      birthDate != null && birthDate!.isAfter(inseminationDate);
+  DateTime? get effectiveBirthDate {
+    if (birthDate != null && birthDate!.isAfter(inseminationDate)) return birthDate;
+    
+    // البحث في السجل للتوافق مع التسجيلات القديمة
+    final births = history.where((e) {
+      final title = e['title']?.toString() ?? '';
+      final type = e['type']?.toString() ?? '';
+      return title.contains('ولادة') || title.contains('مولود') || type == 'birth';
+    }).toList();
+    
+    if (births.isNotEmpty) {
+      births.sort((a, b) => b['date'].toString().compareTo(a['date'].toString()));
+      try {
+        final date = DateTime.parse(births.first['date']);
+        if (date.isAfter(inseminationDate)) return date;
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  bool get isPostBirth => effectiveBirthDate != null;
+
   int get daysSinceBirth {
-    if (!isPostBirth) return 0;
+    final bDate = effectiveBirthDate;
+    if (bDate == null) return 0;
+    
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final birth = DateTime(birthDate!.year, birthDate!.month, birthDate!.day);
+    final birth = DateTime(bDate.year, bDate.month, bDate.day);
     return today.difference(birth).inDays;
+  }
+
+  int get pregnancyDuration {
+    final bDate = effectiveBirthDate;
+    if (bDate != null) {
+      return bDate.difference(inseminationDate).inDays;
+    }
+    return daysSinceInsemination;
   }
 
   double get pregnancyPercentage {
@@ -156,16 +192,15 @@ class Cow {
   });
 
   bool get isHeifer {
-    // ذكر لا يمكن أن يكون بكيرة
+    // الأولوية للتحديد اليدوي إذا وجد
+    if (isManualCow == true) return false; // إذا حُددت كبقرة يدوياً → ليست بكيرة
+    if (isManualCow == false) return true; // إذا حُددت كبكيرة يدوياً → هي بكيرة
+
+    // التوافق مع السجلات القديمة
     if (gender == 'male') return false;
-
-    // إذا ولدت سابقاً فهي بقرة
     if (hasGivenBirth) return false;
-
-    // إذا كانت لا تزال عجولة مستقلة في صفحة العجول → ليست بكيرة بعد
     if (isStandaloneCalf) return false;
 
-    // في قائمة الأبقار ولم تلد بعد → بكيرة
     return true;
   }
 
@@ -275,13 +310,14 @@ class CowAdapter extends TypeAdapter<Cow> {
       isStandaloneCalf: fields[11] as bool? ?? false,
       gender: fields[12] as String?,
       imagePath: fields[13] as String?,
+      isManualCow: fields[14] as bool?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Cow obj) {
     writer
-      ..writeByte(14) // Updated count
+      ..writeByte(15) // Updated count from 14 to 15
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -309,6 +345,8 @@ class CowAdapter extends TypeAdapter<Cow> {
       ..writeByte(12)
       ..write(obj.gender)
       ..writeByte(13)
-      ..write(obj.imagePath);
+      ..write(obj.imagePath)
+      ..writeByte(14)
+      ..write(obj.isManualCow);
   }
 }

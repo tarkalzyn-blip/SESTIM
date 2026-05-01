@@ -1,5 +1,7 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:cow_pregnancy/providers/cow_provider.dart';
 import 'package:cow_pregnancy/utils/app_settings.dart';
 import 'package:cow_pregnancy/providers/alerts_provider.dart';
@@ -9,6 +11,29 @@ import 'package:cow_pregnancy/screens/cow_detail_screen.dart';
 import 'package:cow_pregnancy/services/notification_service.dart';
 import 'package:cow_pregnancy/providers/theme_provider.dart';
 import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
+
+// Provider to manage and persist summary sort preference
+final summarySortProvider = StateNotifierProvider<SummarySortNotifier, SummarySort>((ref) {
+  return SummarySortNotifier();
+});
+
+class SummarySortNotifier extends StateNotifier<SummarySort> {
+  SummarySortNotifier() : super(SummarySort.newest) {
+    _loadFromHive();
+  }
+
+  void _loadFromHive() {
+    final box = Hive.box('settings');
+    final savedSort = box.get('summary_sort_pref', defaultValue: 'newest');
+    state = savedSort == 'oldest' ? SummarySort.oldest : SummarySort.newest;
+  }
+
+  void setSort(SummarySort sort) {
+    state = sort;
+    final box = Hive.box('settings');
+    box.put('summary_sort_pref', sort == SummarySort.oldest ? 'oldest' : 'newest');
+  }
+}
 
 class SummaryScreen extends ConsumerWidget {
   const SummaryScreen({super.key});
@@ -36,12 +61,14 @@ class SummaryScreen extends ConsumerWidget {
     int breedingReady = 0; 
     int breedingMonitoring = 0; 
     int breedingPregnant = 0; 
+    int breedingOverdue = 0;
     int breedingLate = 0; 
     int breedingEmpty = 0; 
 
     List<Cow> listReady = [];
     List<Cow> listMonitoring = [];
     List<Cow> listPregnant = [];
+    List<Cow> listOverdue = [];
     List<Cow> listLate = [];
     List<Cow> listEmpty = [];
 
@@ -49,15 +76,19 @@ class SummaryScreen extends ConsumerWidget {
     int prodMilking = 0; 
     int prodDrying = 0; 
     int prodHeifer = 0; 
+    int prodHeiferClose = 0;
 
     List<Cow> listMilking = [];
     List<Cow> listDrying = [];
     List<Cow> listHeifer = [];
+    List<Cow> listHeiferClose = [];
+    List<Cow> listHeifersReadyForInsem = [];
     
+    final int dryingDays = AppSettings.dryingDays;
     final int pregnancyDays = AppSettings.pregnancyDays;
     final int recoveryDays = AppSettings.recoveryDays;
     final int lateInsemDays = AppSettings.lateInseminationDays;
-    final int dryingDays = AppSettings.dryingDays;
+    final int heiferInsemAge = AppSettings.heiferInseminationAge;
 
     for (var cow in cows) {
       // Use model's built-in logic
@@ -67,9 +98,13 @@ class SummaryScreen extends ConsumerWidget {
 
       // --- حالات التكاثر ---
       if (cow.isInseminated && !cow.isPostBirth) {
+        final daysRemaining = pregnancyDays - cow.daysSinceInsemination;
         if (cow.daysSinceInsemination <= monitoringDays) {
           breedingMonitoring++;
           listMonitoring.add(cow);
+        } else if (daysRemaining < 0) {
+          breedingOverdue++;
+          listOverdue.add(cow);
         } else {
           breedingPregnant++;
           listPregnant.add(cow);
@@ -97,14 +132,36 @@ class SummaryScreen extends ConsumerWidget {
 
       // --- مراحل الإنتاج ---
       if (cow.isHeifer) {
-        prodHeifer++;
-        listHeifer.add(cow);
-      } else if (cow.isInseminated && (pregnancyDays - cow.daysSinceInsemination) <= dryingDays) {
+        final daysRemaining = pregnancyDays - cow.daysSinceInsemination;
+        if (cow.isInseminated && daysRemaining <= dryingDays) {
+          prodHeiferClose++;
+          listHeiferClose.add(cow);
+        } else {
+          prodHeifer++;
+          listHeifer.add(cow);
+        }
+      } else if (cow.isInseminated && !cow.isPostBirth && (pregnancyDays - cow.daysSinceInsemination) <= dryingDays) {
         prodDrying++;
         listDrying.add(cow);
       } else {
         prodMilking++;
         listMilking.add(cow);
+      }
+    }
+
+    // --- حساب العجولات الجاهزة للتلقيح (من صفحة العجول حصراً) ---
+    final standaloneHeifers = allCows.where((c) => 
+      c.isStandaloneCalf && 
+      c.gender == 'female' && 
+      !c.isInseminated
+    ).toList();
+
+    for (var calf in standaloneHeifers) {
+      if (calf.dateOfBirth != null) {
+        final ageInMonths = DateTime.now().difference(calf.dateOfBirth!).inDays / 30;
+        if (ageInMonths >= heiferInsemAge) {
+          listHeifersReadyForInsem.add(calf);
+        }
       }
     }
 
@@ -181,10 +238,11 @@ class SummaryScreen extends ConsumerWidget {
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blueGrey),
             ),
             const SizedBox(height: 16),
-            _buildStatusGrid(context, [
+            _buildStatusGrid(context, ref, [
               _StatusItemData('جاهزة للتلقيح', breedingReady, Colors.green, '🟢', listReady, _TimeInfoType.daysSinceBirth),
               _StatusItemData('تحت الفحص', breedingMonitoring, Colors.amber, '🟡', listMonitoring, _TimeInfoType.daysSinceInsemination),
               _StatusItemData('حوامل', breedingPregnant, Colors.blue, '🔵', listPregnant, _TimeInfoType.monthsDaysSinceInsemination),
+              _StatusItemData('تأخر بالولادة', breedingOverdue, Colors.deepOrange, '⚠️', listOverdue, _TimeInfoType.daysRemainingUntilBirth),
               _StatusItemData('تأخر بالتلقيح', breedingLate, Colors.red, '🔴', listLate, _TimeInfoType.daysSinceBirth),
               _StatusItemData('حديثة الولادة', breedingEmpty, Colors.grey, '⚪', listEmpty, _TimeInfoType.daysSinceBirth),
             ]),
@@ -196,10 +254,22 @@ class SummaryScreen extends ConsumerWidget {
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blueGrey),
             ),
             const SizedBox(height: 16),
-            _buildStatusGrid(context, [
+            _buildStatusGrid(context, ref, [
               _StatusItemData('حلوب', prodMilking, Colors.blueAccent, '🥛', listMilking, _TimeInfoType.daysSinceBirth),
-              _StatusItemData('فترة التجفيف', prodDrying, Colors.indigo, '💤', listDrying, _TimeInfoType.daysRemainingUntilBirth),
-              _StatusItemData('بكيرة', prodHeifer, Colors.orange, '🐄', listHeifer, _TimeInfoType.none),
+              _StatusItemData('مجففة وقريبة من الولادة', prodDrying, Colors.indigo, '💤', listDrying, _TimeInfoType.daysRemainingUntilBirth),
+              _StatusItemData('بكيرة', prodHeifer, Colors.orange, '🐄', listHeifer, _TimeInfoType.monthsDaysSinceInsemination),
+              _StatusItemData('بكيرة قريبة من الولادة', prodHeiferClose, Colors.pinkAccent, '🤰', listHeiferClose, _TimeInfoType.daysRemainingUntilBirth),
+            ]),
+            
+            const SizedBox(height: 30),
+
+            const Text(
+              'إدارة العجولات',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blueGrey),
+            ),
+            const SizedBox(height: 16),
+            _buildStatusGrid(context, ref, [
+              _StatusItemData('عجولات جاهزة للتلقيح', listHeifersReadyForInsem.length, Colors.teal, '🐮✨', listHeifersReadyForInsem, _TimeInfoType.daysSinceBirth),
             ]),
             
             const SizedBox(height: 30),
@@ -453,10 +523,26 @@ class SummaryScreen extends ConsumerWidget {
     );
   }
 
-  void _showCowsListDialog(BuildContext context, String title, List<Cow> cows, Color themeColor, [_TimeInfoType timeInfoType = _TimeInfoType.none]) {
+  void _showCowsListDialog(BuildContext context, WidgetRef ref, String title, List<Cow> cows, Color themeColor, [_TimeInfoType timeInfoType = _TimeInfoType.none]) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => Consumer(
+        builder: (context, ref, _) {
+          final currentSort = ref.watch(summarySortProvider);
+          
+          // منطق الترتيب
+          final sortedCows = List<Cow>.from(cows);
+          sortedCows.sort((a, b) {
+            final valA = _getSortValue(a, timeInfoType);
+            final valB = _getSortValue(b, timeInfoType);
+            if (currentSort == SummarySort.newest) {
+              return valB.compareTo(valA);
+            } else {
+              return valA.compareTo(valB);
+            }
+          });
+
+          return AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         titlePadding: EdgeInsets.zero,
         title: Container(
@@ -479,22 +565,38 @@ class SummaryScreen extends ConsumerWidget {
                   style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: 18),
                 ),
               ),
+              PopupMenuButton<SummarySort>(
+                icon: Icon(Icons.sort, color: themeColor),
+                onSelected: (sort) {
+                  ref.read(summarySortProvider.notifier).setSort(sort);
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: SummarySort.newest,
+                    child: Text('الأحدث أولاً'),
+                  ),
+                  PopupMenuItem(
+                    value: SummarySort.oldest,
+                    child: Text('الأقدم أولاً'),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
         content: SizedBox(
           width: double.maxFinite,
-          child: cows.isEmpty 
+          child: sortedCows.isEmpty 
             ? const Padding(
                 padding: EdgeInsets.symmetric(vertical: 20),
                 child: Text('لا يوجد أبقار في هذه القائمة', textAlign: TextAlign.center),
               )
             : ListView.separated(
                 shrinkWrap: true,
-                itemCount: cows.length,
+                itemCount: sortedCows.length,
                 separatorBuilder: (context, index) => const Divider(height: 1),
                 itemBuilder: (context, index) {
-                  final cow = cows[index];
+                  final cow = sortedCows[index];
                   final timeParts = _buildTimeParts(cow, timeInfoType);
                   final String timeTitle = timeParts.$1;
                   final String timeValue = timeParts.$2;
@@ -558,23 +660,55 @@ class SummaryScreen extends ConsumerWidget {
             child: const Text('إغلاق', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
-      ),
-    );
+      );
+    },
+  ),
+);
+}
+
+  // دالة مساعدة للحصول على قيمة الترتيب بناءً على نوع التوقيت
+  int _getSortValue(Cow cow, _TimeInfoType type) {
+    switch (type) {
+      case _TimeInfoType.daysSinceBirth:
+        if (cow.birthDate != null) return DateTime.now().difference(cow.birthDate!).inDays;
+        return cow.daysSinceBirth;
+      case _TimeInfoType.daysSinceInsemination:
+      case _TimeInfoType.monthsDaysSinceInsemination:
+        return cow.daysSinceInsemination;
+      case _TimeInfoType.daysRemainingUntilBirth:
+        return cow.daysSinceInsemination; // الترتيب حسب مدة الحمل يعطي نفس النتيجة
+      default:
+        try {
+          return int.parse(cow.id.replaceAll(RegExp(r'[^0-9]'), ''));
+        } catch (_) {
+          return 0;
+        }
+    }
   }
 
   // إرجاع (التسمية، القيمة) كزوج منفصل
   (String, String) _buildTimeParts(Cow cow, _TimeInfoType type) {
     switch (type) {
       case _TimeInfoType.daysSinceBirth:
-        int days = 0;
+        final bDate = cow.birthDate ?? cow.dateOfBirth;
+        if (bDate == null) return ('', '');
+        final daysTotal = DateTime.now().difference(bDate).inDays;
+        
         if (cow.birthDate != null) {
-          days = DateTime.now().difference(cow.birthDate!).inDays;
-        } else if (cow.isPostBirth) {
-          days = cow.daysSinceBirth;
+          return ('منذ الولادة', '$daysTotal يوم');
         } else {
-          return ('', '');
+          // تفصيل العمر للعجولة: سنة، شهر، يوم
+          final years = daysTotal ~/ 365;
+          final months = (daysTotal % 365) ~/ 30;
+          final days = (daysTotal % 365) % 30;
+          
+          List<String> parts = [];
+          if (years > 0) parts.add('$years سنة');
+          if (months > 0) parts.add('$months شهر');
+          if (days > 0 || parts.isEmpty) parts.add('$days يوم');
+          
+          return ('العمر', parts.join(' و '));
         }
-        return ('منذ الولادة', '$days يوم');
 
       case _TimeInfoType.daysSinceInsemination:
         if (!cow.isInseminated) return ('', '');
@@ -594,7 +728,8 @@ class SummaryScreen extends ConsumerWidget {
       case _TimeInfoType.daysRemainingUntilBirth:
         if (!cow.isInseminated) return ('', '');
         final daysSinceInsemination = cow.daysSinceInsemination;
-        final daysRemaining = 280 - daysSinceInsemination;
+        final pregDays = AppSettings.pregnancyDays;
+        final daysRemaining = pregDays - daysSinceInsemination;
         if (daysRemaining < 0) {
           return ('متأخرة عن الولادة', '${-daysRemaining} يوم');
         }
@@ -605,7 +740,7 @@ class SummaryScreen extends ConsumerWidget {
     }
   }
 
-  Widget _buildStatusGrid(BuildContext context, List<_StatusItemData> items) {
+  Widget _buildStatusGrid(BuildContext context, WidgetRef ref, List<_StatusItemData> items) {
     return Wrap(
       spacing: 12,
       runSpacing: 12,
@@ -619,7 +754,7 @@ class SummaryScreen extends ConsumerWidget {
         }
 
         return InkWell(
-          onTap: () => _showCowsListDialog(context, item.title, item.cows, item.color, item.timeInfoType),
+          onTap: () => _showCowsListDialog(context, ref, item.title, item.cows, item.color, item.timeInfoType),
           borderRadius: BorderRadius.circular(20),
           child: Container(
             width: width,
@@ -686,4 +821,9 @@ enum _TimeInfoType {
   daysSinceInsemination,
   monthsDaysSinceInsemination,
   daysRemainingUntilBirth,
+}
+
+enum SummarySort {
+  newest,
+  oldest,
 }

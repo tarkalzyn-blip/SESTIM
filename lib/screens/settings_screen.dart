@@ -20,6 +20,17 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appUser = ref.watch(appUserProvider);
+    final cows = ref.watch(cowProvider);
+
+    // التحقق من وجود أبقار قديمة تحتاج تصحيح
+    final legacyAmbiguousCows = cows.where((c) => 
+      !c.isStandaloneCalf && 
+      !c.hasGivenBirth &&
+      (
+        c.isManualCow == null || // لم تُعالج بعد
+        (c.isManualCow == true && c.history.any((e) => e['title']?.toString().contains('انتقال') ?? false)) // عولجت بشكل خاطئ كبقرة وهي بكيرة
+      )
+    ).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -128,7 +139,13 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 12),
+
+            // Legacy Fix Section (Temporary)
+            if (legacyAmbiguousCows.isNotEmpty) ...[
+              _buildLegacyFixCard(context, ref, legacyAmbiguousCows),
+              const SizedBox(height: 12),
+            ],
 
             // Logout Button
             _buildLogoutButton(context, ref),
@@ -150,6 +167,86 @@ class SettingsScreen extends ConsumerWidget {
             fontWeight: FontWeight.bold,
             color: Colors.grey,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegacyFixCard(BuildContext context, WidgetRef ref, List<Cow> ambiguousCows) {
+    return Card(
+      elevation: 0,
+      color: Colors.orange.withValues(alpha: 0.1),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.orange.withValues(alpha: 0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.auto_fix_high, color: Colors.orange),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'تصحيح حالة الأبقار القديمة',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      Text(
+                        'يوجد ${ambiguousCows.length} بقرة تظهر حالياً كـ "بكيرة" وتحتاج لتصحيح.',
+                        style: const TextStyle(fontSize: 13, color: Colors.blueGrey),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () async {
+                  final notifier = ref.read(cowProvider.notifier);
+                  int cowCount = 0;
+                  int heiferCount = 0;
+                  
+                  for (var cow in ambiguousCows) {
+                    // فحص السجل بذكاء
+                    final hasTransferRecord = cow.history.any((e) {
+                      final title = e['title']?.toString() ?? '';
+                      return title.contains('انتقال');
+                    });
+
+                    if (hasTransferRecord) {
+                      // إذا كانت منتقلة من العجول فهي بكيرة
+                      await notifier.updateCow(cow.copyWith(isManualCow: false));
+                      heiferCount++;
+                    } else {
+                      // إذا أضيفت يدوياً بدون سجل انتقال فهي بقرة
+                      await notifier.updateCow(cow.copyWith(isManualCow: true));
+                      cowCount++;
+                    }
+                  }
+                  
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('تم التصحيح: $cowCount أبقار و $heiferCount بكيرات')),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.check_circle_outline),
+                label: const Text('تصحيح الآن'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -277,7 +374,6 @@ class SettingsScreen extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(ctx);
               await ref.read(authActionProvider.notifier).signOut();
-              if (context.mounted) Navigator.pop(context);
             },
             child: const Text('خروج'),
           ),
@@ -444,6 +540,7 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
   late TextEditingController _preg;
   late TextEditingController _rec;
   late TextEditingController _heat;
+  late TextEditingController _heiferAge;
   late TextEditingController _late;
   late TextEditingController _dry;
   late TextEditingController _minInsem;
@@ -459,6 +556,7 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
     );
     _dry = TextEditingController(text: AppSettings.dryingDays.toString());
     _heat = TextEditingController(text: AppSettings.heatCycleDays.toString());
+    _heiferAge = TextEditingController(text: AppSettings.heiferInseminationAge.toString());
     _mon = TextEditingController(text: AppSettings.monitoringDays.toString());
     _minInsem = TextEditingController(
       text: AppSettings.minInseminationDaysAfterBirth.toString(),
@@ -472,6 +570,7 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
     _late.dispose();
     _dry.dispose();
     _heat.dispose();
+    _heiferAge.dispose();
     _mon.dispose();
     _minInsem.dispose();
     super.dispose();
@@ -501,6 +600,7 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
             Icons.dry_cleaning,
           ),
           _buildInput('دورة الشبق (يوم)', _heat, Icons.loop),
+          _buildInput('عمر تلقيح العجولات (بالأشهر)', _heiferAge, Icons.calendar_month, hint: 'العمر الذي ستظهر عنده العجولة في قائمة الجاهزية'),
           const SizedBox(height: 32),
           FilledButton(
             onPressed: () async {
@@ -518,6 +618,9 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
               await AppSettings.setDryingDays(int.tryParse(_dry.text) ?? 60);
               await AppSettings.setHeatCycleDays(
                 int.tryParse(_heat.text) ?? 21,
+              );
+              await AppSettings.setHeiferInseminationAge(
+                int.tryParse(_heiferAge.text) ?? 12,
               );
               if (mounted) {
                 ref.invalidate(cowProvider);

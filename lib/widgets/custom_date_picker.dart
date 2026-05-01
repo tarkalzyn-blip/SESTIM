@@ -8,6 +8,7 @@ class CustomDatePickerField extends StatefulWidget {
   final Function(DateTime) onDateSelected;
   final DateTime? firstDate;
   final DateTime? lastDate;
+  final Color? color;
 
   const CustomDatePickerField({
     super.key,
@@ -16,6 +17,7 @@ class CustomDatePickerField extends StatefulWidget {
     required this.onDateSelected,
     this.firstDate,
     this.lastDate,
+    this.color,
   });
 
   @override
@@ -66,13 +68,14 @@ class _CustomDatePickerFieldState extends State<CustomDatePickerField> {
         labelText: widget.label,
         hintText: 'YYYY-MM-DD',
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        prefixIcon: const Icon(Icons.calendar_today_outlined),
+        prefixIcon: Icon(Icons.calendar_today_outlined, color: widget.color),
+        labelStyle: widget.color != null ? TextStyle(color: widget.color) : null,
         suffixIcon: IconButton(
           icon: const Icon(Icons.date_range),
           onPressed: () async {
             final pickedDate = await showCustomDatePicker(
               context: context,
-              initialDate: DateTime.now(),
+              initialDate: widget.initialDate,
               firstDate: widget.firstDate ?? DateTime(2010),
               lastDate: widget.lastDate ?? DateTime(2100),
               title: widget.label,

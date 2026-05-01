@@ -25,6 +25,10 @@ class AppSettings {
   static Future<void> setHeatCycleDays(int val) =>
       _box.put('heatCycleDays', val);
 
+  static int get heiferInseminationAge => _box.get('heiferInseminationAge', defaultValue: 12);
+  static Future<void> setHeiferInseminationAge(int val) =>
+      _box.put('heiferInseminationAge', val);
+
   static int get minInseminationDaysAfterBirth =>
       _box.get('minInseminationDaysAfterBirth', defaultValue: 45);
   static Future<void> setMinInseminationDaysAfterBirth(int val) =>

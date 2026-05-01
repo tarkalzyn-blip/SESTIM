@@ -1,8 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/foundation.dart';
 import 'package:cow_pregnancy/models/user_model.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:cow_pregnancy/models/cow_model.dart';
+
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -76,20 +78,30 @@ class AuthService {
 
   // Sign out
   Future<void> signOut() async {
+    // مسح البيانات المحلية أولاً قبل تسجيل الخروج
+    // لمنع ظهور بيانات المستخدم القديم بعد الخروج
     try {
-      await _googleSignIn.signOut();
-      await _auth.signOut();
-      
-      // مسح البيانات المحلية لمنع ظهورها للمستخدم التالي (أو الضيف)
       if (Hive.isBoxOpen('cows')) {
         await Hive.box<Cow>('cows').clear();
       }
+    } catch (e) {
+      debugPrint('Error clearing cows box: $e');
+    }
+    try {
       if (Hive.isBoxOpen('notes_box')) {
         await Hive.box('notes_box').clear();
       }
     } catch (e) {
-      rethrow;
+      debugPrint('Error clearing notes box: $e');
     }
+
+    // ثم تسجيل الخروج من Firebase
+    try {
+      await _googleSignIn.signOut();
+    } catch (e) {
+      debugPrint('Google sign out error: $e');
+    }
+    await _auth.signOut();
   }
 
   // Convert Firebase User to AppUser

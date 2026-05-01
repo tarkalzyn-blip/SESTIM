@@ -884,11 +884,12 @@ class CowDetailScreen extends ConsumerWidget {
     items.add(_InfoItem(Icons.timer_outlined, 'العمر الحالي', cow.age, null));
 
     if (cow.isPostBirth) {
+      final bDate = cow.effectiveBirthDate;
       items.add(
         _InfoItem(
           Icons.child_care,
           'تاريخ الولادة',
-          DateFormat('yyyy/MM/dd').format(cow.birthDate!),
+          bDate != null ? DateFormat('yyyy/MM/dd').format(bDate) : 'غير محدد',
           Colors.teal,
         ),
       );
@@ -1061,7 +1062,8 @@ class CowDetailScreen extends ConsumerWidget {
 
   Widget _buildMainRemainingBox(BuildContext context, Cow cow) {
     final daysSinceInsemination = cow.daysSinceInsemination;
-    final daysRemaining = 280 - daysSinceInsemination;
+    final int pregnancyDays = AppSettings.pregnancyDays;
+    final daysRemaining = pregnancyDays - daysSinceInsemination;
     final isBirth = cow.isPostBirth;
     final isOverdue = !isBirth && daysRemaining < 0;
 

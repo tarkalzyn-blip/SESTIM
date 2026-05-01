@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cow_pregnancy/providers/cow_provider.dart';
 import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
 import 'package:cow_pregnancy/screens/cow_detail_screen.dart';
+import 'package:cow_pregnancy/utils/app_settings.dart';
 
 class CowCard extends ConsumerStatefulWidget {
   final Cow cow;
@@ -110,7 +111,9 @@ class _CowCardState extends ConsumerState<CowCard> {
                                       size: 15, color: Colors.grey.shade500),
                                   const SizedBox(width: 4),
                                   Text(
-                                    DateFormat('dd/MM/yyyy').format(cow.inseminationDate),
+                                    cow.isPostBirth 
+                                      ? (cow.effectiveBirthDate != null ? DateFormat('dd/MM/yyyy').format(cow.effectiveBirthDate!) : 'غير محدد')
+                                      : DateFormat('dd/MM/yyyy').format(cow.inseminationDate),
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
@@ -122,7 +125,7 @@ class _CowCardState extends ConsumerState<CowCard> {
 
                               // يمين: عمر الحمل
                               Text(
-                                'عمر الحمل: ${_formatDuration(cow.isPostBirth ? cow.birthDate!.difference(cow.inseminationDate).inDays : cow.daysSinceInsemination)}',
+                                'عمر الحمل: ${_formatDuration(cow.pregnancyDuration)}',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -283,7 +286,8 @@ class _CowCardState extends ConsumerState<CowCard> {
   }
 
   Widget _buildRemainingBox(BuildContext context, Cow cow) {
-    final daysRemaining = 280 - cow.daysSinceInsemination;
+    final int pregnancyDays = AppSettings.pregnancyDays;
+    final daysRemaining = pregnancyDays - cow.daysSinceInsemination;
     final isBirth = cow.isPostBirth;
     final isOverdue = !isBirth && daysRemaining < 0;
 

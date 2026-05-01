@@ -8,6 +8,7 @@ import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
 import 'package:cow_pregnancy/widgets/calf_search_delegate.dart';
 import 'package:cow_pregnancy/providers/settings_provider.dart';
 import 'package:cow_pregnancy/screens/add_calf_screen.dart';
+import 'package:cow_pregnancy/screens/settings_screen.dart';
 
 enum CalfSort { newest, oldest }
 
@@ -354,6 +355,7 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
           .updateCow(
             cow.copyWith(
               isStandaloneCalf: false,
+              isManualCow: false, // تضاف كبكيرة
               isInseminated: true,
               inseminationDate: selectedInsemDate,
               history: [
@@ -400,6 +402,7 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
           motherColorValue: mother.colorValue,
           isInseminated: true,
           isStandaloneCalf: false,
+          isManualCow: false, // تضاف كبكيرة
           history: [
             {
               'title': 'تلقيح أول (انتقال من العجولات)',
@@ -489,6 +492,13 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.settings),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => SettingsScreen()),
+          ),
+        ),
         actions: [
           PopupMenuButton<CalfSort>(
             icon: const Icon(Icons.sort),
@@ -559,7 +569,7 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                   )
                 : ListView.builder(
                     itemCount: calves.length,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
                     itemBuilder: (context, index) {
                       final calf = calves[index];
                       final isMale = calf['note'].toString().contains('ذكر');
