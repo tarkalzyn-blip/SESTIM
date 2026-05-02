@@ -11,6 +11,7 @@ import 'package:cow_pregnancy/screens/activity_log_screen.dart';
 import 'package:cow_pregnancy/screens/reports_screen.dart';
 import 'package:cow_pregnancy/screens/notes_screen.dart';
 import 'package:cow_pregnancy/services/notification_service.dart';
+import 'package:cow_pregnancy/screens/summary_screen.dart' show mainNavIndexProvider, mainNavMoreScreenProvider;
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
@@ -266,6 +267,22 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Listen for navigation commands from other screens (one-way trigger, not persistent watch)
+    ref.listen<int>(mainNavIndexProvider, (previous, next) {
+      if (next != 0 && next != _selectedIndex) {
+        setState(() => _selectedIndex = next);
+        // Reset immediately so back navigation works normally
+        ref.read(mainNavIndexProvider.notifier).state = 0;
+      }
+    });
+    ref.listen<String>(mainNavMoreScreenProvider, (previous, next) {
+      if (next == 'notes' && _moreScreen is! NotesScreen) {
+        setState(() => _moreScreen = const NotesScreen());
+      } else if (next == 'reports' && _moreScreen is! ReportsScreen) {
+        setState(() => _moreScreen = const ReportsScreen());
+      }
+    });
+
     ref.listen<List<SmartAlert>>(alertsProvider, (previous, next) {
       _checkAndShowNewAlerts(next);
       // جدولة الإشعار الصباحي بناءً على التنبيهات الجديدة

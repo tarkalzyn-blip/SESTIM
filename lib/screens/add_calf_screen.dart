@@ -69,6 +69,36 @@ class _AddCalfScreenState extends ConsumerState<AddCalfScreen> {
     Navigator.pop(context);
   }
 
+  bool get _hasUnsavedChanges {
+    return _idController.text.isNotEmpty || 
+           _motherIdController.text.isNotEmpty ||
+           _noteController.text.isNotEmpty;
+  }
+
+  Future<bool> _onWillPop() async {
+    if (!_hasUnsavedChanges) return true;
+
+    final shouldPop = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تجاهل التغييرات؟', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+        content: const Text('لقد قمت بإدخال بيانات لم يتم حفظها. هل أنت متأكد أنك تريد الخروج دون حفظ؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('خروج دون حفظ'),
+          ),
+        ],
+      ),
+    );
+    return shouldPop ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final availableColors = ref.watch(cowColorsProvider);
@@ -79,15 +109,17 @@ class _AddCalfScreenState extends ConsumerState<AddCalfScreen> {
     final isFemale = _gender == 'female';
     final accentColor = isFemale ? Colors.pinkAccent : Colors.blueAccent;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          isFemale ? 'إضافة عجولة (أنثى)' : 'إضافة عجل (ذكر)',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            isFemale ? 'إضافة عجولة (أنثى)' : 'إضافة عجل (ذكر)',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
         ),
-      ),
-      body: Form(
-        key: _formKey,
+        body: Form(
+          key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
@@ -285,6 +317,7 @@ class _AddCalfScreenState extends ConsumerState<AddCalfScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 

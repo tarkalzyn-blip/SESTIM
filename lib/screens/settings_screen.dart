@@ -584,25 +584,30 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _buildInput('مدة الحمل (يوم)', _preg, Icons.calendar_month),
-          _buildInput('فترة الفحص بعد التلقيح (يوم)', _mon, Icons.search, hint: 'بعدها تعتبر البقرة حاملاً تلقائياً', color: Colors.amber),
-          _buildInput('بداية الجاهزية للتلقيح بعد الولادة (يوم)', _rec, Icons.child_care),
-          _buildInput(
-            'الحد الأدنى للتلقيح بعد الولادة (يوم)',
-            _minInsem,
-            Icons.block,
-            hint: 'لن يُسمح بتسجيل التلقيح قبل هذه المدة من الولادة',
-            color: Colors.red,
-          ),
-          _buildInput('تأخر في التلقيح (يوم)', _late, Icons.warning_amber),
-          _buildInput(
-            'بداية فترة التجفيف قبل الولادة (يوم)',
-            _dry,
-            Icons.dry_cleaning,
-          ),
-          _buildInput('دورة الشبق (يوم)', _heat, Icons.loop),
-          _buildInput('عمر تلقيح العجولات (بالأشهر)', _heiferAge, Icons.calendar_month, hint: 'العمر الذي ستظهر عنده العجولة في قائمة الجاهزية'),
-          const SizedBox(height: 32),
+          _buildSectionCard('تجهيز التلقيح', [
+            _buildInput('عمر تلقيح العجولات (بالأشهر)', _heiferAge, Icons.calendar_month, hint: 'العمر الذي ستظهر عنده العجولة في قائمة الجاهزية'),
+            _buildInput('بداية الجاهزية للتلقيح بعد الولادة (يوم)', _rec, Icons.child_care),
+            _buildInput('دورة الشبق (يوم)', _heat, Icons.loop),
+          ]),
+
+          _buildSectionCard('التلقيح والفحص', [
+            _buildInput('تأخر في التلقيح (يوم)', _late, Icons.warning_amber),
+            _buildInput('فترة الفحص بعد التلقيح (يوم)', _mon, Icons.search, hint: 'بعدها تعتبر البقرة حاملاً تلقائياً', color: Colors.amber),
+          ]),
+
+          _buildSectionCard('الحمل والولادة', [
+            _buildInput(
+              'الحد الأدنى للتلقيح بعد الولادة (يوم)',
+              _minInsem,
+              Icons.block,
+              hint: 'لن يُسمح بتسجيل التلقيح قبل هذه المدة من الولادة',
+              color: Colors.red,
+            ),
+            _buildInput('بداية فترة التجفيف قبل الولادة (يوم)', _dry, Icons.dry_cleaning),
+            _buildInput('مدة الحمل (يوم)', _preg, Icons.calendar_month),
+          ]),
+
+          const SizedBox(height: 16),
           FilledButton(
             onPressed: () async {
               await AppSettings.setPregnancyDays(
@@ -634,6 +639,54 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
             },
             child: const Text('حفظ الإعدادات'),
           ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionCard(String title, List<Widget> children) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.blueGrey.withOpacity(0.15)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 4,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).primaryColor,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blueGrey,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          ...children,
         ],
       ),
     );

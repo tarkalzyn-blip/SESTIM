@@ -11,6 +11,12 @@ import 'package:cow_pregnancy/screens/cow_detail_screen.dart';
 import 'package:cow_pregnancy/services/notification_service.dart';
 import 'package:cow_pregnancy/providers/theme_provider.dart';
 import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
+import 'package:cow_pregnancy/screens/notes_screen.dart';
+
+// Shared provider to control the main bottom navigation tab from anywhere
+final mainNavIndexProvider = StateProvider<int>((ref) => 0);
+// Shared provider to control which screen is shown in the "more" tab
+final mainNavMoreScreenProvider = StateProvider<String>((ref) => 'reports');
 
 // Provider to manage and persist summary sort preference
 enum SummarySort { newest, oldest }
@@ -228,6 +234,24 @@ class SummaryScreen extends ConsumerWidget {
           },
           tooltip: 'الإعدادات',
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: TextButton.icon(
+              onPressed: () {
+                ref.read(mainNavMoreScreenProvider.notifier).state = 'notes';
+                ref.read(mainNavIndexProvider.notifier).state = 4;
+              },
+              icon: const Icon(Icons.note_alt_outlined, size: 21),
+              label: const Text('ملاحظات', style: TextStyle(fontSize: 15)),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),

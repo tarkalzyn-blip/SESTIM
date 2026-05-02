@@ -250,6 +250,52 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
     Navigator.pop(context);
   }
 
+  CowFormState _determineInitialState(Cow c) {
+    if (c.isPostBirth) return CowFormState.postBirth;
+    if (c.isInseminated) return CowFormState.pregnant;
+    return CowFormState.heat;
+  }
+
+  bool get _hasUnsavedChanges {
+    if (!_isEditing) {
+      return _idController.text.isNotEmpty || 
+             _bullIdController.text.isNotEmpty ||
+             _motherIdController.text.isNotEmpty;
+    } else {
+      final c = widget.cow!;
+      return _idController.text != c.id ||
+             _selectedColorValue != c.colorValue ||
+             _dateOfBirth != c.dateOfBirth ||
+             _bullIdController.text != (c.bullId ?? '') ||
+             _motherIdController.text != (c.motherId ?? '') ||
+             _currentState != _determineInitialState(c);
+    }
+  }
+
+  Future<bool> _onWillPop() async {
+    if (!_hasUnsavedChanges) return true;
+
+    final shouldPop = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تجاهل التغييرات؟', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+        content: const Text('لقد قمت بإدخال بيانات لم يتم حفظها. هل أنت متأكد أنك تريد الخروج دون حفظ؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('خروج دون حفظ'),
+          ),
+        ],
+      ),
+    );
+    return shouldPop ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final availableColors = ref.watch(cowColorsProvider);
@@ -257,15 +303,17 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
       _selectedColorValue = availableColors.first;
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _isEditing ? 'تعديل بيانات البقرة' : 'إضافة بقرة جديدة',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            _isEditing ? 'تعديل بيانات البقرة' : 'إضافة بقرة جديدة',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
         ),
-      ),
-      body: Form(
-        key: _formKey,
+        body: Form(
+          key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
@@ -517,6 +565,7 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 
