@@ -52,6 +52,11 @@ class AppSettings {
   static Future<void> setNotificationMinute(int val) =>
       _box.put('notificationMinute', val);
 
+  static double get averageDailyMilkPerCow =>
+      _box.get('averageDailyMilkPerCow', defaultValue: 25.0);
+  static Future<void> setAverageDailyMilkPerCow(double val) =>
+      _box.put('averageDailyMilkPerCow', val);
+
   static String get fontFamily => _box.get('fontFamily', defaultValue: 'Cairo');
   static Future<void> setFontFamily(String val) => _box.put('fontFamily', val);
 

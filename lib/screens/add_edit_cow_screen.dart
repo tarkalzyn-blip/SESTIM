@@ -206,8 +206,8 @@ class _AddEditCowScreenState extends ConsumerState<AddEditCowScreen> {
       });
     }
 
-    // أي بقرة تُضاف من صفحة الأبقار → تُعتبر بقرة (Milking) ولا تحتاج لولادة وهمية
-    bool isManualCow = !_isEditing; // true if new addition from this screen
+    // الحفاظ على حالة "البقرة اليدوية" أو "البكيرة" عند التعديل
+    bool isManualCow = widget.cow?.isManualCow ?? !_isEditing;
 
     final cow = Cow(
       id: _idController.text.trim(),

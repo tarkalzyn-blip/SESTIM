@@ -546,6 +546,7 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
   late TextEditingController _dry;
   late TextEditingController _minInsem;
   late TextEditingController _mon;
+  late TextEditingController _milkYield;
 
   @override
   void initState() {
@@ -562,6 +563,7 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
     _minInsem = TextEditingController(
       text: AppSettings.minInseminationDaysAfterBirth.toString(),
     );
+    _milkYield = TextEditingController(text: AppSettings.averageDailyMilkPerCow.toString());
   }
 
   @override
@@ -574,6 +576,7 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
     _heiferAge.dispose();
     _mon.dispose();
     _minInsem.dispose();
+    _milkYield.dispose();
     super.dispose();
   }
 
@@ -607,6 +610,10 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
             _buildInput('مدة الحمل (يوم)', _preg, Icons.calendar_month),
           ]),
 
+          _buildSectionCard('إعدادات الإنتاج', [
+            _buildInput('متوسط الإنتاج اليومي للبقرة (لتر)', _milkYield, Icons.opacity, hint: 'يُستخدم لحساب توقعات إنتاج الحليب الشهرية'),
+          ]),
+
           const SizedBox(height: 16),
           FilledButton(
             onPressed: () async {
@@ -627,6 +634,9 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
               );
               await AppSettings.setHeiferInseminationAge(
                 int.tryParse(_heiferAge.text) ?? 12,
+              );
+              await AppSettings.setAverageDailyMilkPerCow(
+                double.tryParse(_milkYield.text) ?? 25.0,
               );
               if (mounted) {
                 ref.invalidate(cowProvider);

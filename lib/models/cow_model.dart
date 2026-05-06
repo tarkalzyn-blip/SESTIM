@@ -195,15 +195,18 @@ class Cow {
     // الأولوية القصوى: إذا كانت البقرة قد ولدت، فهي بقرة بالغ (حلوب/مجففة) ولا يمكن أن تكون بكيرة أبداً
     if (hasGivenBirth || isPostBirth) return false;
 
-    // الأولوية الثانية للتحديد اليدوي
-    if (isManualCow == true) return false; // حُددت كبقرة يدوياً
-    if (isManualCow == false) return true; // حُددت كبكيرة ولم تلد بعد
+    // إذا حُددت كبقرة يدوياً فهي بالغ
+    if (isManualCow == true) return false;
 
-    // التوافق مع السجلات القديمة
+    // إذا حُددت كبكيرة (منتقلة من العجول) ولم تلد بعد فهي بكيرة
+    if (isManualCow == false) return true;
+
+    // التوافق مع السجلات القديمة: إذا لم نعرف، نفترض أنها بالغ (لأنها في صفحة الأبقار)
+    // إلا إذا كانت عجولة صغيرة جداً (يمكن إضافة شرط العمر هنا لاحقاً إذا لزم الأمر)
     if (gender == 'male') return false;
     if (isStandaloneCalf) return false;
 
-    return true;
+    return false; // الافتراضي هو "بالغ" لضمان عدم ظهور الحلوب كبكيرة
   }
 
   String get status {
