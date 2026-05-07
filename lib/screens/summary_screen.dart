@@ -8,6 +8,7 @@ import 'package:cow_pregnancy/providers/alerts_provider.dart';
 import 'package:cow_pregnancy/models/cow_model.dart';
 import 'package:cow_pregnancy/screens/settings_screen.dart';
 import 'package:cow_pregnancy/screens/cow_detail_screen.dart';
+import 'package:cow_pregnancy/screens/calf_detail_screen.dart';
 import 'package:cow_pregnancy/services/notification_service.dart';
 import 'package:cow_pregnancy/providers/theme_provider.dart';
 import 'package:cow_pregnancy/widgets/cow_id_badge.dart';
@@ -79,6 +80,8 @@ class SummaryScreen extends ConsumerWidget {
 
     // Filter out standalone calves for cow-related stats
     final cows = allCows.where((c) => !c.isStandaloneCalf).toList();
+
+
 
     ref.listen(alertsProvider, (previous, next) {
       if (next.isNotEmpty) {
@@ -197,6 +200,7 @@ class SummaryScreen extends ConsumerWidget {
     }
 
     final allCalves = ref.watch(allCalvesProvider);
+    List<Map<String, dynamic>> readyCalfMaps = []; 
 
     for (var calfMap in allCalves) {
       if (calfMap['isExited'] == true) continue;
@@ -220,6 +224,7 @@ class SummaryScreen extends ConsumerWidget {
           history: [],
         );
         listHeifersReadyForInsem.add(tempCow);
+        readyCalfMaps.add(calfMap);
       }
     }
 
@@ -342,12 +347,12 @@ class SummaryScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             _buildStatusGrid(context, ref, [
-              _StatusItemData('جاهزة للتلقيح', breedingReady, Colors.green, '🟢', listReady, _TimeInfoType.daysSinceBirthOnly),
-              _StatusItemData('تحت الفحص', breedingMonitoring, Colors.amber, '🟡', listMonitoring, _TimeInfoType.daysSinceInsemination),
-              _StatusItemData('حوامل', breedingPregnant, Colors.blue, '🔵', listPregnant, _TimeInfoType.monthsDaysSinceInsemination),
-              _StatusItemData('تأخر بالولادة', breedingOverdue, Colors.deepOrange, '⚠️', listOverdue, _TimeInfoType.daysRemainingUntilBirth),
-              _StatusItemData('تأخر بالتلقيح', breedingLate, Colors.red, '🔴', listLate, _TimeInfoType.daysSinceBirthOnly),
-              _StatusItemData('حديثة الولادة', breedingEmpty, Colors.grey, '⚪', listEmpty, _TimeInfoType.daysSinceBirthOnly),
+              _StatusItemData('جاهزة للتلقيح', breedingReady, Colors.green, '🟢', listReady, timeInfoType: _TimeInfoType.daysSinceBirthOnly),
+              _StatusItemData('تحت الفحص', breedingMonitoring, Colors.amber, '🟡', listMonitoring, timeInfoType: _TimeInfoType.daysSinceInsemination),
+              _StatusItemData('حوامل', breedingPregnant, Colors.blue, '🔵', listPregnant, timeInfoType: _TimeInfoType.monthsDaysSinceInsemination),
+              _StatusItemData('تأخر بالولادة', breedingOverdue, Colors.deepOrange, '⚠️', listOverdue, timeInfoType: _TimeInfoType.daysRemainingUntilBirth),
+              _StatusItemData('تأخر بالتلقيح', breedingLate, Colors.red, '🔴', listLate, timeInfoType: _TimeInfoType.daysSinceBirthOnly),
+              _StatusItemData('حديثة الولادة', breedingEmpty, Colors.grey, '⚪', listEmpty, timeInfoType: _TimeInfoType.daysSinceBirthOnly),
             ]),
             
             const SizedBox(height: 30),
@@ -357,10 +362,10 @@ class SummaryScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             _buildStatusGrid(context, ref, [
-              _StatusItemData('حلوب', prodMilking, Colors.blueAccent, '🥛', listMilking, _TimeInfoType.daysSinceBirth),
-              _StatusItemData('مجففة وقريبة من الولادة', prodDrying, Colors.indigo, '💤', listDrying, _TimeInfoType.daysRemainingUntilBirth),
-              _StatusItemData('بكيرة', prodHeifer, Colors.orange, '🐄', listHeifer, _TimeInfoType.monthsDaysSinceInsemination),
-              _StatusItemData('بكيرة قريبة من الولادة', prodHeiferClose, Colors.pinkAccent, '🤰', listHeiferClose, _TimeInfoType.daysRemainingUntilBirth),
+              _StatusItemData('حلوب', prodMilking, Colors.blueAccent, '🥛', listMilking, timeInfoType: _TimeInfoType.daysSinceBirth),
+              _StatusItemData('مجففة وقريبة من الولادة', prodDrying, Colors.indigo, '💤', listDrying, timeInfoType: _TimeInfoType.daysRemainingUntilBirth),
+              _StatusItemData('بكيرة', prodHeifer, Colors.orange, '🐄', listHeifer, timeInfoType: _TimeInfoType.monthsDaysSinceInsemination),
+              _StatusItemData('بكيرة قريبة من الولادة', prodHeiferClose, Colors.pinkAccent, '🤰', listHeiferClose, timeInfoType: _TimeInfoType.daysRemainingUntilBirth),
             ]),
             
             const SizedBox(height: 30),
@@ -370,7 +375,16 @@ class SummaryScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             _buildStatusGrid(context, ref, [
-              _StatusItemData('عجولات جاهزة للتلقيح', listHeifersReadyForInsem.length, Colors.teal, '🐮✨', listHeifersReadyForInsem, _TimeInfoType.daysSinceBirth),
+              _StatusItemData(
+                'عجولات جاهزة للتلقيح', 
+                listHeifersReadyForInsem.length, 
+                Colors.teal, 
+                '🐮✨', 
+                listHeifersReadyForInsem, 
+                timeInfoType: _TimeInfoType.daysSinceBirth,
+                isCalfList: true,
+                calfMaps: readyCalfMaps,
+              ),
             ]),
             
             const SizedBox(height: 30),
@@ -643,7 +657,14 @@ class SummaryScreen extends ConsumerWidget {
     );
   }
 
-  void _showCowsListDialog(BuildContext context, WidgetRef ref, String title, List<Cow> cows, Color themeColor, [_TimeInfoType timeInfoType = _TimeInfoType.none]) {
+  void _showCowsListDialog(
+    BuildContext context, 
+    WidgetRef ref, 
+    String title, 
+    List<Cow> cows, 
+    Color themeColor, 
+    [_TimeInfoType timeInfoType = _TimeInfoType.none, bool isCalfList = false, List<Map<String, dynamic>>? calfMaps]
+  ) {
     showDialog(
       context: context,
       builder: (context) => Consumer(
@@ -699,7 +720,21 @@ class SummaryScreen extends ConsumerWidget {
                       return InkWell(
                         onTap: () {
                           Navigator.pop(context);
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => CowDetailScreen(cow: cow)));
+                          if (isCalfList && calfMaps != null) {
+                            // Find original map for CalfDetailScreen
+                            try {
+                              final originalMap = calfMaps.firstWhere(
+                                (m) => (m['calfId'] ?? 'غير معروف') == cow.id && 
+                                       (m['calfColorValue'] ?? Colors.grey.toARGB32()) == cow.colorValue
+                              );
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => CalfDetailScreen(calfData: originalMap)));
+                            } catch (e) {
+                              // Fallback if not found
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => CowDetailScreen(cow: cow)));
+                            }
+                          } else {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => CowDetailScreen(cow: cow)));
+                          }
                         },
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
@@ -746,7 +781,16 @@ class SummaryScreen extends ConsumerWidget {
         if ((items.length % 2 != 0) && isLastItem) width = MediaQuery.of(context).size.width - 40;
 
         return InkWell(
-          onTap: () => _showCowsListDialog(context, ref, item.title, item.cows, item.color, item.timeInfoType),
+          onTap: () => _showCowsListDialog(
+            context, 
+            ref, 
+            item.title, 
+            item.cows, 
+            item.color, 
+            item.timeInfoType,
+            item.isCalfList,
+            item.calfMaps,
+          ),
           borderRadius: BorderRadius.circular(20),
           child: Container(
             width: width,
@@ -867,7 +911,19 @@ class _StatusItemData {
   final String emoji;
   final List<Cow> cows;
   final _TimeInfoType timeInfoType;
-  _StatusItemData(this.title, this.count, this.color, this.emoji, this.cows, [this.timeInfoType = _TimeInfoType.none]);
+  final bool isCalfList;
+  final List<Map<String, dynamic>>? calfMaps;
+
+  _StatusItemData(
+    this.title, 
+    this.count, 
+    this.color, 
+    this.emoji, 
+    this.cows, {
+    this.timeInfoType = _TimeInfoType.none, 
+    this.isCalfList = false, 
+    this.calfMaps,
+  });
 }
 
 enum _TimeInfoType {

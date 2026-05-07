@@ -8,6 +8,7 @@ import 'package:cow_pregnancy/screens/settings_screen.dart';
 import 'package:cow_pregnancy/providers/edit_access_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:cow_pregnancy/models/cow_model.dart';
+import 'package:cow_pregnancy/screens/summary_screen.dart';
 
 class CalfDetailScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> calfData;
@@ -25,6 +26,11 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
   void initState() {
     super.initState();
     _currentCalfData = Map.from(widget.calfData);
+    
+    // Ensure date is DateTime object
+    if (_currentCalfData['date'] is String) {
+      _currentCalfData['date'] = DateTime.parse(_currentCalfData['date']);
+    }
   }
 
   String get _calculateAge {
@@ -373,6 +379,44 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
   }
 
   void _processAddVaccine(String vaccineName, DateTime date) {
+    // التحقق مما إذا كانت هذه "تلقيح" لعجولة كبيرة
+    final isMale = _currentCalfData['note'].toString().contains('ذكر');
+    final ageInDays = DateTime.now().difference(_currentCalfData['date'] as DateTime).inDays;
+
+    if (!isMale && ageInDays >= 365) {
+      // إظهار تنبيه للمستخدم
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('هل هذا تلقيح؟'),
+          content: const Text(
+            'لقد سجلت لقاحاً لعجولة تجاوزت السنة من عمرها. هل هذا هو "تلقيحها الأول"؟\n\nإذا كان نعم، سيتم نقلها تلقائياً لسجل الأبقار (البكائر).',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _performAddVaccine(vaccineName, date);
+              },
+              child: const Text('مجرد لقاح عادي'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _showMoveToHerdDialog();
+              },
+              child: const Text('نعم، تلقيح ونقل'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    _performAddVaccine(vaccineName, date);
+  }
+
+  void _performAddVaccine(String vaccineName, DateTime date) {
     final cows = ref.read(cowProvider);
     final cowIndex = cows.indexWhere(
       (c) => c.uniqueKey == _currentCalfData['motherUniqueKey'],
@@ -382,6 +426,11 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
       final cow = cows[cowIndex];
       final originalDate = _currentCalfData['originalEventDate'];
       final storedEventId = _currentCalfData['eventId']?.toString();
+      
+      final isMale = _currentCalfData['note'].toString().contains('ذكر');
+      final ageInDays = DateTime.now().difference(_currentCalfData['date'] as DateTime).inDays;
+      final shouldMoveToHerd = !isMale && ageInDays >= 365;
+
       final newHistory = cow.history.map((event) {
         if (_matchEvent(event, storedEventId, originalDate)) {
           final newEvent = Map<String, dynamic>.from(event);
@@ -389,8 +438,16 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
           vaccines.add({'date': date.toIso8601String(), 'name': vaccineName});
           newEvent['vaccines'] = vaccines;
 
+          if (shouldMoveToHerd) {
+             // Mark as exited from calves if it's a born calf
+             newEvent['isExited'] = true;
+             newEvent['exitReason'] = 'انتقال للقطيع (تلقيح/لقاح)';
+             newEvent['exitDate'] = date.toIso8601String();
+          }
+
           setState(() {
             _currentCalfData['vaccines'] = vaccines;
+            if (shouldMoveToHerd) _currentCalfData['isExited'] = true;
           });
 
           return newEvent;
@@ -398,16 +455,71 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
         return event;
       }).toList();
 
-      ref
-          .read(cowProvider.notifier)
-          .updateCow(cow.copyWith(history: newHistory));
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم تسجيل اللقاح بنجاح'),
-          backgroundColor: Colors.teal,
-        ),
-      );
+      if (shouldMoveToHerd) {
+        if (_currentCalfData['isStandalone'] == true) {
+          // Update standalone calf to become a cow
+          ref.read(cowProvider.notifier).updateCow(
+            cow.copyWith(
+              isStandaloneCalf: false,
+              isManualCow: false,
+              isInseminated: true,
+              inseminationDate: date,
+              history: [
+                ...newHistory,
+                {
+                  'title': 'تلقيح/لقاح أول (انتقال للقطيع)',
+                  'date': date.toIso8601String(),
+                  'note': 'تم تسجيل لقاح/تلقيح ونقلها لقطيع الأبقار. اللقاح: $vaccineName',
+                  'eventId': const Uuid().v4(),
+                },
+              ],
+            ),
+          );
+        } else {
+          // Mark mother's history and create new cow
+          ref.read(cowProvider.notifier).updateCow(cow.copyWith(history: newHistory));
+          
+          final newCow = Cow(
+            id: _currentCalfData['calfId'] ?? 'New',
+            inseminationDate: date,
+            isInseminated: true,
+            colorValue: _currentCalfData['calfColorValue'],
+            motherId: _currentCalfData['motherId'],
+            motherColorValue: _currentCalfData['motherColorValue'],
+            dateOfBirth: _currentCalfData['date'] as DateTime,
+            history: [
+              {
+                'title': 'تلقيح/لقاح أول (بكيرة)',
+                'date': date.toIso8601String(),
+                'note': 'تم النقل من سجل المواليد بعد تسجيل لقاح: $vaccineName',
+                'eventId': const Uuid().v4(),
+              }
+            ],
+          );
+          ref.read(cowProvider.notifier).addCow(newCow);
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم تسجيل اللقاح ونقل البكيرة للقطيع بنجاح'),
+            backgroundColor: Colors.teal,
+          ),
+        );
+        
+        // Navigate to Cows screen
+        ref.read(mainNavIndexProvider.notifier).state = 1;
+        if (mounted) Navigator.pop(context);
+        
+      } else {
+        // Just a normal vaccine for a young calf
+        ref.read(cowProvider.notifier).updateCow(cow.copyWith(history: newHistory));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم تسجيل اللقاح بنجاح'),
+            backgroundColor: Colors.teal,
+          ),
+        );
+      }
     }
   }
 
@@ -513,42 +625,63 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
 
     if (cowIndex != -1) {
       final cow = cows[cowIndex];
-      final originalDate = _currentCalfData['originalEventDate'];
-      final storedEventId = _currentCalfData['eventId']?.toString();
 
-      final newHistory = cow.history.map((event) {
-        if (_matchEvent(event, storedEventId, originalDate)) {
-          final newEvent = Map<String, dynamic>.from(event);
-          newEvent['isExited'] = true;
-          newEvent['exitReason'] = 'نقل للقطيع';
-          newEvent['exitDate'] = date.toIso8601String();
-          return newEvent;
-        }
-        return event;
-      }).toList();
+      if (_currentCalfData['isStandalone'] == true) {
+        // حالة العجولة المستقلة (المشتراة)
+        ref.read(cowProvider.notifier).updateCow(
+          cow.copyWith(
+            isStandaloneCalf: false,
+            isManualCow: false, // تضاف كبكيرة
+            isInseminated: true,
+            inseminationDate: date,
+            history: [
+              ...cow.history,
+              {
+                'title': 'تلقيح أول (انتقال للقطيع)',
+                'date': date.toIso8601String(),
+                'note': 'تم التلقيح الأول ونقلها لقطيع الأبقار. رقم الملقح: $bullId',
+                'eventId': const Uuid().v4(),
+              },
+            ],
+          ),
+        );
+      } else {
+        // حالة العجولة المولودة (التابعة لتاريخ أم)
+        final originalDate = _currentCalfData['originalEventDate'];
+        final storedEventId = _currentCalfData['eventId']?.toString();
 
-      ref
-          .read(cowProvider.notifier)
-          .updateCow(cow.copyWith(history: newHistory));
-
-      final newCow = Cow(
-        id: _currentCalfData['calfId'] ?? 'New',
-        inseminationDate: date,
-        isInseminated: true,
-        colorValue: _currentCalfData['calfColorValue'],
-        motherId: _currentCalfData['motherId'],
-        motherColorValue: _currentCalfData['motherColorValue'],
-        dateOfBirth: _currentCalfData['date'] as DateTime,
-        history: [
-          {
-            'title': 'تلقيح أول (بكيرة)',
-            'date': date.toIso8601String(),
-            'note': 'تم النقل من سجل المواليد. رقم الملقح: $bullId',
-            'eventId': const Uuid().v4(),
+        final newHistory = cow.history.map((event) {
+          if (_matchEvent(event, storedEventId, originalDate)) {
+            final newEvent = Map<String, dynamic>.from(event);
+            newEvent['isExited'] = true;
+            newEvent['exitReason'] = 'نقل للقطيع';
+            newEvent['exitDate'] = date.toIso8601String();
+            return newEvent;
           }
-        ],
-      );
-      ref.read(cowProvider.notifier).addCow(newCow);
+          return event;
+        }).toList();
+
+        ref.read(cowProvider.notifier).updateCow(cow.copyWith(history: newHistory));
+
+        final newCow = Cow(
+          id: _currentCalfData['calfId'] ?? 'New',
+          inseminationDate: date,
+          isInseminated: true,
+          colorValue: _currentCalfData['calfColorValue'],
+          motherId: _currentCalfData['motherId'],
+          motherColorValue: _currentCalfData['motherColorValue'],
+          dateOfBirth: _currentCalfData['date'] as DateTime,
+          history: [
+            {
+              'title': 'تلقيح أول (بكيرة)',
+              'date': date.toIso8601String(),
+              'note': 'تم النقل من سجل المواليد. رقم الملقح: $bullId',
+              'eventId': const Uuid().v4(),
+            }
+          ],
+        );
+        ref.read(cowProvider.notifier).addCow(newCow);
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -556,6 +689,14 @@ class _CalfDetailScreenState extends ConsumerState<CalfDetailScreen> {
           backgroundColor: Colors.orange,
         ),
       );
+
+      // Navigate to Cows screen
+      ref.read(mainNavIndexProvider.notifier).state = 1;
+      
+      // Close detail screen
+      if (mounted) {
+        Navigator.pop(context);
+      }
     }
   }
 

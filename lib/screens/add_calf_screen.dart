@@ -36,9 +36,41 @@ class _AddCalfScreenState extends ConsumerState<AddCalfScreen> {
 
     final availableColors = ref.read(cowColorsProvider);
     final colorValue = _selectedColorValue ?? (availableColors.isNotEmpty ? availableColors.first : Colors.blue.toARGB32());
+    final enteredId = _idController.text.trim();
+
+    // ── التحقق من التكرار ──────────────────────────────────────
+    final allCows = ref.read(cowProvider);
+    final candidateKey = '${enteredId}_$colorValue';
+    final isDuplicate = allCows.any((c) => c.uniqueKey == candidateKey);
+
+    if (isDuplicate) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('رقم مكرر!', style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Text(
+            'يوجد بالفعل حيوان برقم "$enteredId" ونفس اللون في المزرعة.\n\nيُرجى تغيير الرقم أو اختيار لون مختلف.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('حسناً'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    // ───────────────────────────────────────────────────────────
 
     final newCalf = Cow(
-      id: _idController.text.trim(),
+      id: enteredId,
       inseminationDate: _birthDate,
       dateOfBirth: _birthDate,
       colorValue: colorValue,

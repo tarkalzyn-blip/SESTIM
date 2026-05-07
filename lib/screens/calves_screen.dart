@@ -9,6 +9,7 @@ import 'package:cow_pregnancy/widgets/calf_search_delegate.dart';
 import 'package:cow_pregnancy/providers/settings_provider.dart';
 import 'package:cow_pregnancy/screens/add_calf_screen.dart';
 import 'package:cow_pregnancy/screens/settings_screen.dart';
+import 'package:cow_pregnancy/screens/summary_screen.dart';
 
 enum CalfSort { newest, oldest }
 
@@ -425,6 +426,9 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
         ),
       );
     }
+
+    // Navigate to Cows screen
+    ref.read(mainNavIndexProvider.notifier).state = 1;
   }
 
   @override
@@ -575,15 +579,26 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                       final isMale = calf['note'].toString().contains('ذكر');
                       final calfId = calf['calfId'];
                       final calfColor = Color(calf['calfColorValue']);
+                      final ageInDays = _calculateAgeInDays(calf['date']);
+                      final isReadyForHerd =
+                          !isMale &&
+                          calf['isExited'] != true &&
+                          ageInDays >= 365;
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(15),
                           side: BorderSide(
-                            color: calfColor.withValues(alpha: 0.3),
+                            color: isReadyForHerd
+                                ? Colors.amber.shade600
+                                : calfColor.withValues(alpha: 0.3),
+                            width: isReadyForHerd ? 2.0 : 1.0,
                           ),
                         ),
+                        color: isReadyForHerd
+                            ? Colors.amber.withValues(alpha: 0.06)
+                            : null,
                         child: InkWell(
                           onTap: () => Navigator.push(
                             context,
@@ -597,91 +612,143 @@ class _CalvesScreenState extends ConsumerState<CalvesScreen> {
                           borderRadius: BorderRadius.circular(15),
                           child: Padding(
                             padding: const EdgeInsets.all(16),
-                            child: Row(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                CowIdBadge(
-                                  id: calfId?.toString() ?? '?',
-                                  color: calfColor,
-                                  boxSize: 18,
-                                  padding: const EdgeInsets.all(8),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '${calf['isStandalone'] == true ? "شراء" : "مولود"} #${calfId ?? "بدون"}',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'العمر: ${_calculateAge(calf['date'])}',
-                                        style: const TextStyle(
-                                          color: Colors.blueGrey,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      if (calf['motherId'] != null)
-                                        Row(
-                                          children: [
-                                            const Text(
-                                              'الأم: ',
-                                              style: TextStyle(fontSize: 12),
-                                            ),
-                                            CowIdBadge(
-                                              id: calf['motherId'].toString(),
-                                              color: calf['motherColor'],
-                                              fontSize: 12,
-                                              boxSize: 12,
-                                            ),
-                                          ],
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                if (!isMale &&
-                                    calf['isExited'] != true &&
-                                    _calculateAgeInDays(calf['date']) >= 365)
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.upgrade,
-                                      color: Colors.teal,
+                                Row(
+                                  children: [
+                                    CowIdBadge(
+                                      id: calfId?.toString() ?? '?',
+                                      color: calfColor,
+                                      boxSize: 18,
+                                      padding: const EdgeInsets.all(8),
                                     ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  '${calf['isStandalone'] == true ? "شراء" : "مولود"} #${calfId ?? "بدون"}',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16,
+                                                  ),
+                                                ),
+                                              ),
+                                              if (isReadyForHerd)
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 3,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color:
+                                                        Colors.amber.shade600,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            20),
+                                                  ),
+                                                  child: const Text(
+                                                    '⭐ جاهزة للتلقيح',
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'العمر: ${_calculateAge(calf['date'])}',
+                                            style: TextStyle(
+                                              color: isReadyForHerd
+                                                  ? Colors.amber.shade800
+                                                  : Colors.blueGrey,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          if (calf['motherId'] != null)
+                                            Row(
+                                              children: [
+                                                const Text(
+                                                  'الأم: ',
+                                                  style:
+                                                      TextStyle(fontSize: 12),
+                                                ),
+                                                CowIdBadge(
+                                                  id: calf['motherId']
+                                                      .toString(),
+                                                  color: calf['motherColor'],
+                                                  fontSize: 12,
+                                                  boxSize: 12,
+                                                ),
+                                              ],
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isMale
+                                            ? Colors.blue.shade300
+                                            : Colors.pink.shade300,
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        isMale ? 'ذكر' : 'أنثى',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (isReadyForHerd) ...[
+                                  const SizedBox(height: 12),
+                                  FilledButton.icon(
                                     onPressed: () =>
                                         _moveToHerd(context, ref, calf),
-                                    tooltip: 'تلقيح ونقل للقطيع',
-                                  ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isMale
-                                        ? Colors.blue.shade300
-                                        : Colors.pink.shade300,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    isMale ? 'ذكر' : 'أنثى',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
+                                    icon: const Icon(Icons.upgrade, size: 18),
+                                    label: const Text(
+                                      'تلقيح ونقل للقطيع',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: Colors.amber.shade600,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 10),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                      ),
                                     ),
                                   ),
-                                ),
+                                ],
                               ],
                             ),
                           ),
                         ),
                       );
+
                     },
                   ),
           ),
