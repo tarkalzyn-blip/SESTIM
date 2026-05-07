@@ -657,6 +657,77 @@ class SummaryScreen extends ConsumerWidget {
     );
   }
 
+  // يعيد نص الأيام المتبقية للحدث القادم مرتبطاً بإعدادات المزرعة
+  String? _buildCountdownText(Cow cow, String listTitle) {
+    final pregnancyDays = AppSettings.pregnancyDays;
+    final monitoringDays = AppSettings.monitoringDays;
+    final dryingDays = AppSettings.dryingDays;
+    final recoveryDays = AppSettings.recoveryDays;
+
+    switch (listTitle) {
+      case 'تحت الفحص':
+        // باقي كم يوم حتى ينتهي وقت الفحص ويصبح حاملاً
+        final remaining = monitoringDays - cow.daysSinceInsemination;
+        if (remaining > 0) return 'باقي $remaining يوم للتأكيد';
+        return 'انتهت فترة الفحص';
+
+      case 'حوامل':
+      case 'بكيرة':
+        // باقي كم يوم للولادة
+        if (cow.isInseminated) {
+          final remaining = pregnancyDays - cow.daysSinceInsemination;
+          if (remaining > 0) return 'باقي $remaining يوم للولادة';
+          return 'تجاوزت موعد الولادة';
+        }
+        return null;
+
+      case 'مجففة وقريبة من الولادة':
+      case 'بكيرة قريبة من الولادة':
+      case 'تأخر بالولادة':
+        // باقي كم يوم للولادة (قد يكون سالباً)
+        if (cow.isInseminated) {
+          final remaining = pregnancyDays - cow.daysSinceInsemination;
+          if (remaining > 0) return 'باقي $remaining يوم للولادة';
+          return 'تأخرت ${-remaining} يوم';
+        }
+        return null;
+
+      case 'حلوب':
+        // باقي كم يوم حتى التنشيف
+        if (cow.isInseminated) {
+          final dryingStart = pregnancyDays - dryingDays;
+          final remaining = dryingStart - cow.daysSinceInsemination;
+          if (remaining > 0) return 'باقي $remaining يوم للتنشيف';
+          return 'حان وقت التنشيف';
+        }
+        return null;
+
+      case 'حديثة الولادة':
+        // باقي كم يوم حتى انتهاء فترة الراحة
+        if (cow.isPostBirth) {
+          final remaining = recoveryDays - cow.daysSinceBirth;
+          if (remaining > 0) return 'باقي $remaining يوم للراحة';
+          return 'انتهت فترة الراحة';
+        }
+        return null;
+
+      case 'جاهزة للتلقيح':
+        if (cow.isPostBirth) {
+          return 'منذ ${cow.daysSinceBirth} يوم';
+        }
+        return null;
+
+      case 'تأخر بالتلقيح':
+        if (cow.isPostBirth) {
+          return 'مرّ ${cow.daysSinceBirth} يوم من الولادة';
+        }
+        return null;
+
+      default:
+        return null;
+    }
+  }
+
   void _showCowsListDialog(
     BuildContext context, 
     WidgetRef ref, 
@@ -717,6 +788,7 @@ class SummaryScreen extends ConsumerWidget {
                     itemBuilder: (context, index) {
                       final cow = sortedCows[index];
                       final timeParts = _buildTimeParts(cow, timeInfoType);
+                      final countdownText = _buildCountdownText(cow, title);
                       return InkWell(
                         onTap: () {
                           Navigator.pop(context);
@@ -752,7 +824,31 @@ class SummaryScreen extends ConsumerWidget {
                                   ],
                                 ),
                               ),
-                              CowIdBadge(id: cow.id, color: cow.color, fontSize: 14, boxSize: 15),
+                              // رقم البقرة + عداد الأيام المتبقية
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  CowIdBadge(id: cow.id, color: cow.color, fontSize: 14, boxSize: 15),
+                                  if (countdownText != null) ...[
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: themeColor.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        countdownText,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: themeColor,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
                               const SizedBox(width: 6),
                               Icon(Icons.arrow_forward_ios, size: 13, color: Colors.grey.shade400),
                             ],
