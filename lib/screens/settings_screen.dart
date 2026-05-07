@@ -547,6 +547,7 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
   late TextEditingController _minInsem;
   late TextEditingController _mon;
   late TextEditingController _milkYield;
+  late bool _showCountdown;
 
   @override
   void initState() {
@@ -564,6 +565,7 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
       text: AppSettings.minInseminationDaysAfterBirth.toString(),
     );
     _milkYield = TextEditingController(text: AppSettings.averageDailyMilkPerCow.toString());
+    _showCountdown = AppSettings.showCountdownInLists;
   }
 
   @override
@@ -614,6 +616,26 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
             _buildInput('متوسط الإنتاج اليومي للبقرة (لتر)', _milkYield, Icons.opacity, hint: 'يُستخدم لحساب توقعات إنتاج الحليب الشهرية'),
           ]),
 
+          _buildSectionCard('عرض اللوحة الذكية', [
+            SwitchListTile(
+              value: _showCountdown,
+              activeThumbColor: Colors.teal,
+              secondary: Icon(
+                Icons.timer_outlined,
+                color: _showCountdown ? Colors.teal : Colors.grey,
+              ),
+              title: const Text(
+                'عداد الأيام المتبقية',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: const Text(
+                'إظهار كم يوم باقي للتأكيد / الولادة / التنشيف / الراحة في قوائم اللوحة الذكية',
+                style: TextStyle(fontSize: 12),
+              ),
+              onChanged: (val) => setState(() => _showCountdown = val),
+            ),
+          ]),
+
           const SizedBox(height: 16),
           FilledButton(
             onPressed: () async {
@@ -638,6 +660,7 @@ class _FarmSettingsPageState extends ConsumerState<FarmSettingsPage> {
               await AppSettings.setAverageDailyMilkPerCow(
                 double.tryParse(_milkYield.text) ?? 25.0,
               );
+              await AppSettings.setShowCountdownInLists(_showCountdown);
               if (mounted) {
                 ref.invalidate(cowProvider);
                 ref.invalidate(alertsProvider);

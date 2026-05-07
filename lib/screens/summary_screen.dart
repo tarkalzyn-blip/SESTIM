@@ -659,6 +659,9 @@ class SummaryScreen extends ConsumerWidget {
 
   // يعيد نص الأيام المتبقية للحدث القادم مرتبطاً بإعدادات المزرعة
   String? _buildCountdownText(Cow cow, String listTitle) {
+    // إذا كانت الميزة مطفأة من إعدادات المزرعة لا نُظهر شيئاً
+    if (!AppSettings.showCountdownInLists) return null;
+
     final pregnancyDays = AppSettings.pregnancyDays;
     final monitoringDays = AppSettings.monitoringDays;
     final dryingDays = AppSettings.dryingDays;

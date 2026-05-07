@@ -18,6 +18,10 @@ class AppSettings {
   static int get dryingDays => _box.get('dryingDays', defaultValue: 60);
   static Future<void> setDryingDays(int val) => _box.put('dryingDays', val);
 
+  static bool get showCountdownInLists => _box.get('showCountdownInLists', defaultValue: true);
+  static Future<void> setShowCountdownInLists(bool val) => _box.put('showCountdownInLists', val);
+
+
   static int get monitoringDays => _box.get('monitoringDays', defaultValue: 25);
   static Future<void> setMonitoringDays(int val) => _box.put('monitoringDays', val);
 
